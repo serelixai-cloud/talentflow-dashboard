@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { font-family: 'Inter', sans-serif; }
         body { background-color: #f8faf8; }
@@ -19,70 +20,34 @@
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .modal-content { background: white; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
         .toast { position: fixed; bottom: 20px; right: 20px; background: white; border-left: 4px solid #10b981; padding: 1rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1100; animation: slideIn 0.3s ease-in-out; }
+        .toast-error { border-left-color: #ef4444; }
         @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+        const { useState, useRef, useEffect, useCallback, createContext, useContext } = React;
 
-        const generateCandidates = () => {
-            const firstNames = ['Olivia', 'Liam', 'Emma', 'Noah', 'Ava', 'Ethan', 'Sophia', 'Mason', 'Isabella', 'Lucas'];
-            const lastNames = ['Chen', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
-            const sources = ['LinkedIn', 'Indeed', 'Referral', 'Job Board', 'Career Site', 'Agent'];
-            const pipelines = ['Senior Frontend Dev', 'Product Manager', 'UX Designer', 'Data Analyst', 'DevOps Engineer', 'Marketing Lead'];
-            const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
-            const candidates = [];
-            for (let i = 0; i < 120; i++) {
-                candidates.push({
-                    id: 'c' + i,
-                    name: firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)],
-                    email: 'candidate' + i + '@example.com',
-                    phone: '+1 (' + Math.floor(Math.random() * 900 + 200) + ') ' + Math.floor(Math.random() * 900 + 100) + '-' + Math.floor(Math.random() * 9000 + 1000),
-                    pipeline: pipelines[Math.floor(Math.random() * pipelines.length)],
-                    stage: stages[Math.floor(Math.random() * stages.length)],
-                    score: Math.floor(Math.random() * 61 + 40),
-                    source: sources[Math.floor(Math.random() * sources.length)],
-                    notes: '',
-                    emails: []
-                });
-            }
-            return candidates;
-        };
+        // ââ SUPABASE CONFIG âââââââââââââââââââââââââââââââââââââââââââââââââ
+        // Replace these with your project values from Supabase â Settings â API
+        const SUPABASE_URL = 'https://tgsvhgxtpuibhtuiygsk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnc3ZoZ3h0cHVpYmh0dWl5Z3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDAxMTIsImV4cCI6MjA4OTA3NjExMn0.ZjTqDQfFd61uLvTSCgS3nHY0TF27pWgR5ca0JNLZG9o';
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const generateTemplates = () => [
-            { id: 't1', name: 'Screening Invitation', subject: 'Schedule Your Screening Assessment', body: 'Hi {{candidate_name}}, We would like to invite you to complete our screening assessment. {{screening_link}}', variables: ['candidate_name', 'screening_link'], system: true },
-            { id: 't2', name: 'Interview Confirmation', subject: 'Interview Scheduled - {{date}}', body: 'Hi {{candidate_name}}, Your interview has been scheduled for {{date}} at {{time}}. Best regards, {{recruiter_name}}', variables: ['candidate_name', 'date', 'time', 'recruiter_name'], system: true },
-            { id: 't3', name: 'Rejection Notice', subject: 'Application Status Update', body: 'Hi {{candidate_name}}, Thank you for your interest in the {{position}} role. Unfortunately, we have decided to move forward with other candidates.', variables: ['candidate_name', 'position'], system: true },
-            { id: 't4', name: 'Offer Letter', subject: 'Job Offer - {{position}}', body: 'Hi {{candidate_name}}, We are pleased to offer you the {{position}} role at {{salary}} per annum.', variables: ['candidate_name', 'position', 'salary'], system: false },
-            { id: 't5', name: 'Onboarding Welcome', subject: 'Welcome to the Team!', body: 'Hi {{candidate_name}}, Welcome aboard! Your first day is {{start_date}}.', variables: ['candidate_name', 'start_date'], system: false }
-        ];
+        // ââ APP CONTEXT âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        const AppCtx = createContext({ orgId: null, user: null, profile: null, toast: () => {} });
 
-        const generateTeamMembers = () => [
-            { id: 'tm1', name: 'Sarah Chen', email: 'sarah@apexdigital.com', role: 'Recruiter', assigned: 18, hired: 6, conversion: '33%' },
-            { id: 'tm2', name: 'Marcus Johnson', email: 'marcus@apexdigital.com', role: 'Hiring Manager', assigned: 24, hired: 9, conversion: '38%' },
-            { id: 'tm3', name: 'Elena Rodriguez', email: 'elena@apexdigital.com', role: 'Recruiter', assigned: 15, hired: 4, conversion: '27%' },
-            { id: 'tm4', name: 'David Park', email: 'david@apexdigital.com', role: 'Admin', assigned: 12, hired: 5, conversion: '42%' },
-            { id: 'tm5', name: 'Jessica Lee', email: 'jessica@apexdigital.com', role: 'Coordinator', assigned: 10, hired: 3, conversion: '30%' },
-            { id: 'tm6', name: 'Zain M', email: 'zain@apexdigital.com', role: 'Admin', assigned: 20, hired: 8, conversion: '40%' }
-        ];
+        // ââ UTILITIES âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        function Toast({ message, type, onDismiss }) {
+            useEffect(() => { const t = setTimeout(onDismiss, 4000); return () => clearTimeout(t); }, [onDismiss]);
+            return <div className={`toast ${type === 'error' ? 'toast-error' : ''}`}><p className="text-sm text-gray-800">{message}</p></div>;
+        }
 
-        const generateNovaData = () => [
-            { id: 'ns1', candidateName: 'Alex Thompson', score: 87, status: 'Passed', date: '2026-03-10', questions: [{ q: 'Describe your leadership style', a: 'Collaborative and inclusive', score: 90 }] },
-            { id: 'ns2', candidateName: 'Jamie Lee', score: 62, status: 'Failed', date: '2026-03-09', questions: [{ q: 'Tell us about a challenge', a: 'Handled customer disputes', score: 60 }] },
-            { id: 'ns3', candidateName: 'Morgan Blake', score: 85, status: 'Passed', date: '2026-03-08', questions: [{ q: 'What are your goals?', a: 'Growth and impact', score: 85 }] },
-            { id: 'ns4', candidateName: 'Casey Rodriguez', score: 71, status: 'Pending', date: '2026-03-07', questions: [{ q: 'Experience with agile?', a: 'Yes, 3 years', score: 72 }] },
-            { id: 'ns5', candidateName: 'Taylor Kim', score: 92, status: 'Passed', date: '2026-03-06', questions: [{ q: 'Problem solving approach?', a: 'Data-driven analysis', score: 92 }] },
-            { id: 'ns6', candidateName: 'Jordan Smith', score: 58, status: 'Failed', date: '2026-03-05', questions: [{ q: 'Communication skills?', a: 'Basic level', score: 58 }] }
-        ];
-
-        function Toast({ message, onDismiss }) {
-            useEffect(() => {
-                const timer = setTimeout(onDismiss, 3000);
-                return () => clearTimeout(timer);
-            }, [onDismiss]);
-            return <div className="toast"><p className="text-sm text-gray-800">{message}</p></div>;
+        function Spinner({ size = 5 }) {
+            return <svg className={`spin w-${size} h-${size} text-emerald-600`} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/></svg>;
         }
 
         function Logo() {
@@ -100,19 +65,14 @@
             const [open, setOpen] = useState(false);
             const ref = useRef(null);
             useEffect(() => {
-                const handleClickOutside = (event) => {
-                    if (ref.current && !ref.current.contains(event.target)) setOpen(false);
-                };
-                if (open) {
-                    document.addEventListener('mousedown', handleClickOutside);
-                    return () => document.removeEventListener('mousedown', handleClickOutside);
-                }
+                const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+                if (open) { document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }
             }, [open]);
             return (
                 <div className="relative" ref={ref}>
                     <button onClick={() => setOpen(!open)} className="text-gray-700 hover:text-emerald-600 text-sm font-medium flex items-center gap-1">
                         {label}
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {open && (
                         <div className="nav-dropdown">
@@ -127,53 +87,125 @@
             );
         }
 
+        // ââ AUTH PAGE âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        function AuthPage() {
+            const [mode, setMode] = useState('login');
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [name, setName] = useState('');
+            const [company, setCompany] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [success, setSuccess] = useState('');
+
+            const handleSignup = async () => {
+                if (!name || !company || !email || !password) { setError('All fields are required.'); return; }
+                setLoading(true); setError('');
+                try {
+                    const { data: { user }, error: authErr } = await sb.auth.signUp({ email, password });
+                    if (authErr) throw authErr;
+                    if (!user) { setSuccess('Check your email to confirm your account, then sign in.'); setLoading(false); return; }
+                    const { data: org, error: orgErr } = await sb.from('organizations').insert({ name: company }).select().single();
+                    if (orgErr) throw orgErr;
+                    const { error: profErr } = await sb.from('profiles').insert({ id: user.id, org_id: org.id, name, email, role: 'Admin' });
+                    if (profErr) throw profErr;
+                    setSuccess('Account created! Signing you in...');
+                } catch(e) { setError(e.message || 'Something went wrong.'); }
+                setLoading(false);
+            };
+
+            const handleLogin = async () => {
+                if (!email || !password) { setError('Email and password are required.'); return; }
+                setLoading(true); setError('');
+                try {
+                    const { error: authErr } = await sb.auth.signInWithPassword({ email, password });
+                    if (authErr) throw authErr;
+                } catch(e) { setError(e.message || 'Invalid credentials.'); }
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 w-full max-w-sm">
+                        <Logo />
+                        <h2 className="text-xl font-bold text-gray-900 mt-6 mb-1">
+                            {mode === 'login' ? 'Welcome back' : 'Create your workspace'}
+                        </h2>
+                        <p className="text-sm text-gray-500 mb-6">
+                            {mode === 'login' ? 'Sign in to your TalentFlow account' : 'Start hiring smarter today'}
+                        </p>
+                        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">{error}</div>}
+                        {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-lg mb-4">{success}</div>}
+                        {mode === 'signup' && (
+                            <>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Your name</label>
+                                <input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Company name</label>
+                                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corp" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                            </>
+                        )}
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleSignup())} />
+                        <button onClick={mode === 'login' ? handleLogin : handleSignup} disabled={loading}
+                            className="w-full py-2.5 emerald-gradient text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                            {loading ? <Spinner size={4} /> : null}
+                            {loading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create workspace'}
+                        </button>
+                        <p className="text-sm text-gray-500 text-center mt-4">
+                            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+                            <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccess(''); }} className="text-emerald-600 font-medium">
+                                {mode === 'login' ? 'Sign up free' : 'Sign in'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        // ââ NAVBAR ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
         function Navbar({ currentPage, onNavigate }) {
-            const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+            const { profile } = useContext(AppCtx);
+            const [userMenuOpen, setUserMenuOpen] = useState(false);
             const userRef = useRef(null);
             useEffect(() => {
-                const handleClickOutside = (event) => {
-                    if (userRef.current && !userRef.current.contains(event.target)) setUserDropdownOpen(false);
-                };
-                if (userDropdownOpen) {
-                    document.addEventListener('mousedown', handleClickOutside);
-                    return () => document.removeEventListener('mousedown', handleClickOutside);
-                }
-            }, [userDropdownOpen]);
+                const h = e => { if (userRef.current && !userRef.current.contains(e.target)) setUserMenuOpen(false); };
+                if (userMenuOpen) { document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }
+            }, [userMenuOpen]);
+
+            const handleSignOut = async () => { await sb.auth.signOut(); };
+
             return (
-                <nav className="sticky top-0 z-40 bg-white border-b border-gray-200 h-14 flex items-center px-6 gap-8">
-                    <Logo />
-                    <div className="flex gap-6 flex-1">
-                        <button onClick={() => onNavigate('dashboard')} className={'text-sm font-medium ' + (currentPage === 'dashboard' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Dashboard</button>
-                        <button onClick={() => onNavigate('pipelines')} className={'text-sm font-medium ' + (currentPage === 'pipelines' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Pipelines</button>
-                        <Dropdown label="Candidates" items={[{ id: 'overview', label: 'Overview' }, { id: 'duplicates', label: 'Duplicates' }]} onSelect={item => onNavigate('candidates-' + item.id)} />
-                        <button onClick={() => onNavigate('templates')} className={'text-sm font-medium ' + (currentPage === 'templates' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Templates</button>
-                        <button onClick={() => onNavigate('nova')} className={'text-sm font-medium ' + (currentPage === 'nova' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Nova</button>
-                        <Dropdown label="Organisation" items={[
-                            { id: 'members', label: 'Members & Permissions' },
-                            { id: 'branding', label: 'Branding' },
-                            { id: 'company', label: 'Company Details' },
-                            { id: 'email', label: 'Email Domain' },
-                            { id: 'applications', label: 'Applications' },
-                            { id: 'calendar', label: 'Calendar' },
-                            { id: 'billing', label: 'Billing' },
-                            { id: 'statistics', label: 'Statistics' },
-                            { id: 'leaderboard', label: 'Leaderboard' }
-                        ]} onSelect={item => onNavigate('org-' + item.id)} />
+                <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+                    <div className="flex items-center gap-8">
+                        <Logo />
+                        <div className="flex items-center gap-6">
+                            <button onClick={() => onNavigate('dashboard')} className={`text-sm font-medium ${currentPage === 'dashboard' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Dashboard</button>
+                            <button onClick={() => onNavigate('pipelines')} className={`text-sm font-medium ${currentPage === 'pipelines' || currentPage.startsWith('pipeline-detail') ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Pipelines</button>
+                            <Dropdown label="Candidates" items={[{id:'overview',label:'Overview'},{id:'duplicates',label:'Duplicates'}]} onSelect={i => onNavigate('candidates-' + i.id)} />
+                            <button onClick={() => onNavigate('templates')} className={`text-sm font-medium ${currentPage === 'templates' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Templates</button>
+                            <button onClick={() => onNavigate('nova')} className={`text-sm font-medium ${currentPage === 'nova' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Nova</button>
+                            <Dropdown label="Organisation" items={[{id:'members',label:'Members'},{id:'leaderboard',label:'Leaderboard'}]} onSelect={i => onNavigate('org-' + i.id)} />
+                        </div>
                     </div>
-                    <div className="flex items-center gap-4 ml-auto">
-                        <span className="text-sm font-medium text-gray-700">Apex Digital</span>
-                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded">ENTERPRISE</span>
-                        <button className="relative">
-                            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                            <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">2</span>
-                        </button>
-                        <button className="text-gray-700"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg></button>
+                    <div className="flex items-center gap-4">
+                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium">{profile?.role || 'Admin'}</span>
                         <div className="relative" ref={userRef}>
-                            <button onClick={() => setUserDropdownOpen(!userDropdownOpen)} className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-bold">ZM</button>
-                            {userDropdownOpen && (
-                                <div className="nav-dropdown right-0 left-auto">
-                                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Profile</button>
-                                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-b">Logout</button>
+                            <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 text-sm text-gray-700 hover:text-emerald-600">
+                                <div className="w-8 h-8 rounded-full emerald-gradient flex items-center justify-center text-white text-xs font-bold">
+                                    {(profile?.name || 'U').charAt(0).toUpperCase()}
+                                </div>
+                                <span className="font-medium">{profile?.name || 'User'}</span>
+                            </button>
+                            {userMenuOpen && (
+                                <div className="nav-dropdown right-0 left-auto w-48">
+                                    <div className="px-4 py-2 border-b border-gray-100">
+                                        <p className="text-xs font-medium text-gray-900">{profile?.name}</p>
+                                        <p className="text-xs text-gray-500">{profile?.email}</p>
+                                    </div>
+                                    <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b">Sign out</button>
                                 </div>
                             )}
                         </div>
@@ -182,432 +214,456 @@
             );
         }
 
+        // ââ DASHBOARD PAGE ââââââââââââââââââââââââââââââââââââââââââââââââââ
         function DashboardPage() {
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
+            const { orgId } = useContext(AppCtx);
+            const [stats, setStats] = useState({ total: 0, hired: 0, rate: 0, pipelines: 0 });
+            const [chartData, setChartData] = useState([]);
+            const [recentCandidates, setRecentCandidates] = useState([]);
+            const [hiredData, setHiredData] = useState([]);
+            const [emailData, setEmailData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const lineRef = useRef(null); const lineChart = useRef(null);
+            const barRef = useRef(null); const barChart = useRef(null);
+            const doughnutRef = useRef(null); const doughnutChart = useRef(null);
+
             useEffect(() => {
-                if (chartRef.current && typeof Chart !== 'undefined') {
-                    const ctx = chartRef.current.getContext('2d');
-                    if (chartInstance.current) chartInstance.current.destroy();
-                    chartInstance.current = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: ['Mar 1', 'Mar 5', 'Mar 10', 'Mar 15', 'Mar 20', 'Mar 25', 'Mar 30'],
-                            datasets: [{ label: 'Candidates', data: [42, 48, 55, 62, 78, 95, 120], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.4, fill: true }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 130 } } }
-                    });
-                }
-                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-            }, []);
+                if (!orgId) return;
+                const load = async () => {
+                    const [{ data: candidates }, { data: pipelines }] = await Promise.all([
+                        sb.from('candidates').select('id,name,stage,source,created_at').eq('org_id', orgId).order('created_at', { ascending: false }),
+                        sb.from('pipelines').select('id,name').eq('org_id', orgId).eq('status', 'Active')
+                    ]);
+                    const all = candidates || [];
+                    const hired = all.filter(c => c.stage === 'Hired').length;
+                    const total = all.length;
+                    setStats({ total, hired, rate: total > 0 ? Math.round((hired/total)*100) : 0, pipelines: (pipelines||[]).length });
+                    setRecentCandidates(all.slice(0, 6));
+
+                    // Line chart: candidates over last 30 days
+                    const now = new Date();
+                    const points = [];
+                    for (let i = 30; i >= 0; i -= 3) {
+                        const d = new Date(now); d.setDate(d.getDate() - i);
+                        points.push({ label: d.toLocaleDateString('en-US',{month:'short',day:'numeric'}), count: all.filter(c => new Date(c.created_at) <= d).length });
+                    }
+                    setChartData(points);
+
+                    // Bar chart: hired per pipeline
+                    const pipelineCounts = {};
+                    all.filter(c => c.stage === 'Hired').forEach(c => { pipelineCounts[c.pipeline_name || 'Other'] = (pipelineCounts[c.pipeline_name || 'Other'] || 0) + 1; });
+                    setHiredData(Object.entries(pipelineCounts).slice(0,6));
+
+                    // Doughnut: source breakdown
+                    const sourceCounts = {};
+                    all.forEach(c => { sourceCounts[c.source || 'Unknown'] = (sourceCounts[c.source || 'Unknown'] || 0) + 1; });
+                    setEmailData(Object.entries(sourceCounts).slice(0,5));
+
+                    setLoading(false);
+                };
+                load();
+            }, [orgId]);
+
+            useEffect(() => {
+                if (!lineRef.current || chartData.length === 0) return;
+                if (lineChart.current) lineChart.current.destroy();
+                lineChart.current = new Chart(lineRef.current, { type: 'line', data: { labels: chartData.map(d=>d.label), datasets: [{ data: chartData.map(d=>d.count), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.1)', fill:true, tension:0.4, pointRadius:3 }] }, options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} } });
+            }, [chartData]);
+
+            useEffect(() => {
+                if (!barRef.current || hiredData.length === 0) return;
+                if (barChart.current) barChart.current.destroy();
+                barChart.current = new Chart(barRef.current, { type:'bar', data:{ labels:hiredData.map(d=>d[0]), datasets:[{data:hiredData.map(d=>d[1]),backgroundColor:'#10b981',borderRadius:4}] }, options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}} });
+            }, [hiredData]);
+
+            useEffect(() => {
+                if (!doughnutRef.current || emailData.length === 0) return;
+                if (doughnutChart.current) doughnutChart.current.destroy();
+                doughnutChart.current = new Chart(doughnutRef.current, { type:'doughnut', data:{ labels:emailData.map(d=>d[0]), datasets:[{data:emailData.map(d=>d[1]),backgroundColor:['#10b981','#3b82f6','#f59e0b','#8b5cf6','#ef4444']}] }, options:{responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}}} });
+            }, [emailData]);
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
             return (
-                <div className="p-6 space-y-6">
-                    <div className="emerald-gradient rounded-lg p-6 text-white"><p className="text-sm opacity-90">Total Candidates</p><p className="text-4xl font-bold mt-2">120</p></div>
-                    <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Candidates Over Time</h3><canvas ref={chartRef}></canvas></div>
-                    <div className="grid grid-cols-3 gap-6">
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3><div className="space-y-3 text-sm"><div className="text-gray-700">Emma Davis moved to Interview</div><div className="text-gray-700">Liam Chen added to Screening</div></div></div>
-                        <div className="bg-green-50 rounded-lg p-6 border border-green-200"><p className="text-sm text-gray-600">Hired This Month</p><p className="text-3xl font-bold text-green-600 mt-2">8</p></div>
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Email Analytics</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span>Sent:</span><span className="font-medium">245</span></div></div></div>
+                <div className="p-6">
+                    <div className="grid grid-cols-4 gap-6 mb-6">
+                        <div className="emerald-gradient rounded-xl p-6 text-white shadow-sm"><p className="text-sm opacity-80 font-medium">Total Candidates</p><p className="text-4xl font-bold mt-2">{stats.total}</p></div>
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"><p className="text-sm text-gray-600 font-medium">Hired</p><p className="text-4xl font-bold text-emerald-600 mt-2">{stats.hired}</p></div>
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"><p className="text-sm text-gray-600 font-medium">Conversion Rate</p><p className="text-4xl font-bold text-emerald-600 mt-2">{stats.rate}%</p></div>
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"><p className="text-sm text-gray-600 font-medium">Active Pipelines</p><p className="text-4xl font-bold text-emerald-600 mt-2">{stats.pipelines}</p></div>
                     </div>
-                    <div className="grid grid-cols-3 gap-6">
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Screening Stats</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span>Passed:</span><span className="text-green-600 font-medium">34</span></div><div className="flex justify-between"><span>Failed:</span><span className="text-red-600 font-medium">8</span></div></div></div>
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Pipeline Breakdown</h3><div className="space-y-2 text-xs"><div><div className="flex justify-between mb-1"><span>Frontend</span><span>20</span></div><div className="w-full bg-gray-200 h-2 rounded"><div className="bg-blue-500 h-2 rounded" style={{width:'33%'}}></div></div></div></div></div>
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Sources Breakdown</h3><div className="space-y-2 text-xs"><div><div className="flex justify-between mb-1"><span>LinkedIn</span><span>45</span></div><div className="w-full bg-gray-200 h-2 rounded"><div className="bg-emerald-500 h-2 rounded" style={{width:'38%'}}></div></div></div></div></div>
+                    <div className="grid grid-cols-3 gap-6 mb-6">
+                        <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                            <h3 className="font-semibold text-gray-900 mb-4">Candidates Over Time</h3>
+                            {chartData.length > 0 ? <canvas ref={lineRef} /> : <p className="text-sm text-gray-400 text-center py-8">Add candidates to see data</p>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                            <h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                            {recentCandidates.length > 0 ? recentCandidates.map(c => (
+                                <div key={c.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">{(c.name||'?').charAt(0)}</div>
+                                    <div className="min-w-0"><p className="text-sm font-medium text-gray-900 truncate">{c.name}</p><p className="text-xs text-gray-500">{c.stage} Â· {c.source || 'Unknown'}</p></div>
+                                </div>
+                            )) : <p className="text-sm text-gray-400 text-center py-8">No candidates yet</p>}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                            <h3 className="font-semibold text-gray-900 mb-4">Hired by Pipeline</h3>
+                            {hiredData.length > 0 ? <canvas ref={barRef} /> : <p className="text-sm text-gray-400 text-center py-8">No hiring data yet</p>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                            <h3 className="font-semibold text-gray-900 mb-4">Candidate Sources</h3>
+                            {emailData.length > 0 ? <canvas ref={doughnutRef} /> : <p className="text-sm text-gray-400 text-center py-8">No source data yet</p>}
+                        </div>
                     </div>
                 </div>
             );
         }
 
+        // ââ PIPELINES PAGE ââââââââââââââââââââââââââââââââââââââââââââââââââ
         function PipelinesPage({ onNavigate }) {
-            const pipelines = [
-                { name: 'Senior Frontend Dev', count: 20 },
-                { name: 'Product Manager', count: 18 },
-                { name: 'UX Designer', count: 16 },
-                { name: 'Data Analyst', count: 19 },
-                { name: 'DevOps Engineer', count: 17 },
-                { name: 'Marketing Lead', count: 14 }
-            ];
+            const { orgId, toast } = useContext(AppCtx);
+            const [pipelines, setPipelines] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showAdd, setShowAdd] = useState(false);
+            const [newName, setNewName] = useState('');
+            const [saving, setSaving] = useState(false);
+
+            const load = useCallback(async () => {
+                if (!orgId) return;
+                const { data } = await sb.from('pipelines').select('*').eq('org_id', orgId).order('created_at', {ascending: false});
+                setPipelines(data || []);
+                setLoading(false);
+            }, [orgId]);
+
+            useEffect(() => { load(); }, [load]);
+
+            const addPipeline = async () => {
+                if (!newName.trim()) return;
+                setSaving(true);
+                const { data, error } = await sb.from('pipelines').insert({ org_id: orgId, name: newName.trim(), status: 'Active' }).select().single();
+                if (error) { toast(error.message, 'error'); } else { setPipelines(p => [data, ...p]); toast('Pipeline created'); }
+                setNewName(''); setShowAdd(false); setSaving(false);
+            };
+
+            const toggleStatus = async (pipeline) => {
+                const newStatus = pipeline.status === 'Active' ? 'Paused' : 'Active';
+                const { error } = await sb.from('pipelines').update({ status: newStatus }).eq('id', pipeline.id);
+                if (error) { toast(error.message, 'error'); return; }
+                setPipelines(p => p.map(x => x.id === pipeline.id ? {...x, status: newStatus} : x));
+                toast(`Pipeline ${newStatus.toLowerCase()}`);
+            };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
             return (
                 <div className="p-6">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Pipelines</h1>
-                    <div className="grid grid-cols-3 gap-6">
-                        {pipelines.map(pipeline => (
-                            <div key={pipeline.name} className="bg-white rounded-lg p-6 border border-gray-200 hover:shadow-lg transition">
-                                <h3 className="font-semibold text-gray-900 mb-2">{pipeline.name}</h3>
-                                <p className="text-3xl font-bold text-emerald-600 mb-4">{pipeline.count}</p>
-                                <button onClick={() => onNavigate('pipeline-detail', pipeline.name)} className="w-full bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700 text-sm font-medium">View Pipeline</button>
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Pipelines</h1>
+                        <button onClick={() => setShowAdd(true)} className="emerald-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">+ New Pipeline</button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        {pipelines.map(p => (
+                            <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start mb-3">
+                                    <h3 className="font-semibold text-gray-900">{p.name}</h3>
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${p.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mb-4">Created {new Date(p.created_at).toLocaleDateString()}</p>
+                                <div className="flex gap-2">
+                                    <button onClick={() => onNavigate('pipeline-detail', p)} className="flex-1 text-center py-1.5 text-sm text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50">View</button>
+                                    <button onClick={() => toggleStatus(p)} className="flex-1 text-center py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">{p.status === 'Active' ? 'Pause' : 'Activate'}</button>
+                                </div>
                             </div>
                         ))}
+                        {pipelines.length === 0 && (
+                            <div className="col-span-3 text-center py-16 text-gray-400">
+                                <p className="text-lg font-medium mb-2">No pipelines yet</p>
+                                <p className="text-sm">Create your first pipeline to start tracking candidates</p>
+                            </div>
+                        )}
                     </div>
+                    {showAdd && (
+                        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">New Pipeline</h2>
+                                <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPipeline()} placeholder="e.g. Senior Frontend Developer" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" autoFocus />
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowAdd(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-700">Cancel</button>
+                                    <button onClick={addPipeline} disabled={saving} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">
+                                        {saving ? <Spinner size={4} /> : null} Create
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        function PipelineDetailPage({ pipelineName, candidates, setCandidates, templates, onBack }) {
-            const [viewMode, setViewMode] = useState('kanban');
-            const [searchQuery, setSearchQuery] = useState('');
-            const [showAddModal, setShowAddModal] = useState(false);
-            const [selectedCandidate, setSelectedCandidate] = useState(null);
-            const [formData, setFormData] = useState({ name: '', email: '', phone: '', stage: 'Applied' });
-            const pipelineCandidates = candidates.filter(c => c.pipeline === pipelineName);
-            const filtered = pipelineCandidates.filter(c => c.name.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1 || c.email.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1);
+        // ââ PIPELINE DETAIL PAGE ââââââââââââââââââââââââââââââââââââââââââââ
+        function PipelineDetailPage({ pipeline, onBack }) {
+            const { orgId, toast } = useContext(AppCtx);
             const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
-            const handleAddCandidate = () => {
-                if (formData.name && formData.email) {
-                    setCandidates(candidates.concat([{
-                        id: 'c' + Date.now(),
-                        name: formData.name,
-                        email: formData.email,
-                        phone: formData.phone,
-                        pipeline: pipelineName,
-                        stage: formData.stage,
-                        score: 70,
-                        source: 'Manual',
-                        notes: '',
-                        emails: []
-                    }]));
-                    setFormData({ name: '', email: '', phone: '', stage: 'Applied' });
-                    setShowAddModal(false);
-                }
+            const [candidates, setCandidates] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showAdd, setShowAdd] = useState(false);
+            const [form, setForm] = useState({ name:'', email:'', phone:'', source:'LinkedIn', score:70 });
+            const [saving, setSaving] = useState(false);
+            const [selected, setSelected] = useState(null);
+
+            const load = useCallback(async () => {
+                if (!orgId || !pipeline) return;
+                const { data } = await sb.from('candidates').select('*').eq('org_id', orgId).eq('pipeline_id', pipeline.id).order('created_at', {ascending: false});
+                setCandidates(data || []); setLoading(false);
+            }, [orgId, pipeline]);
+
+            useEffect(() => { load(); }, [load]);
+
+            const addCandidate = async () => {
+                if (!form.name.trim()) return;
+                setSaving(true);
+                const { data, error } = await sb.from('candidates').insert({ org_id: orgId, pipeline_id: pipeline.id, pipeline_name: pipeline.name, name: form.name, email: form.email, phone: form.phone, source: form.source, score: parseInt(form.score)||70, stage: 'Applied', notes: '' }).select().single();
+                if (error) { toast(error.message, 'error'); } else { setCandidates(c => [data, ...c]); toast('Candidate added'); }
+                setForm({ name:'', email:'', phone:'', source:'LinkedIn', score:70 }); setShowAdd(false); setSaving(false);
             };
+
+            const moveStage = async (candidateId, newStage) => {
+                const { error } = await sb.from('candidates').update({ stage: newStage }).eq('id', candidateId);
+                if (error) { toast(error.message, 'error'); return; }
+                setCandidates(c => c.map(x => x.id === candidateId ? {...x, stage: newStage} : x));
+                if (selected?.id === candidateId) setSelected(s => ({...s, stage: newStage}));
+                toast('Stage updated');
+            };
+
+            const updateNotes = async (id, notes) => {
+                await sb.from('candidates').update({ notes }).eq('id', id);
+                setCandidates(c => c.map(x => x.id === id ? {...x, notes} : x));
+            };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
             return (
                 <div className="p-6">
-                    <button onClick={onBack} className="text-emerald-600 font-medium mb-4">â Back</button>
-                    <div className="flex justify-between items-center mb-6">
-                        <div><h1 className="text-2xl font-bold text-gray-900">{pipelineName}</h1><p className="text-gray-600">{filtered.length} candidates</p></div>
-                        <button onClick={() => setShowAddModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 font-medium">Add Candidate</button>
+                    <div className="flex items-center gap-3 mb-6">
+                        <button onClick={onBack} className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg> Pipelines
+                        </button>
+                        <span className="text-gray-300">/</span>
+                        <h1 className="text-xl font-bold text-gray-900">{pipeline.name}</h1>
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${pipeline.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>{pipeline.status}</span>
+                        <div className="ml-auto">
+                            <button onClick={() => setShowAdd(true)} className="emerald-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Candidate</button>
+                        </div>
                     </div>
-                    <div className="flex gap-4 mb-6">
-                        <input type="text" placeholder="Search by name or email..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                        <button onClick={() => setViewMode('kanban')} className={'px-4 py-2 rounded font-medium ' + (viewMode === 'kanban' ? 'bg-emerald-600 text-white' : 'bg-gray-200')}>Kanban</button>
-                        <button onClick={() => setViewMode('table')} className={'px-4 py-2 rounded font-medium ' + (viewMode === 'table' ? 'bg-emerald-600 text-white' : 'bg-gray-200')}>Table</button>
-                    </div>
-                    {viewMode === 'kanban' && (
-                        <div className="flex gap-4 overflow-x-auto pb-4">
-                            {stages.map(stage => (
-                                <div key={stage} className="kanban-column bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                    <h3 className="font-semibold text-gray-900 mb-4">{stage}</h3>
-                                    <div className="space-y-3">
-                                        {filtered.filter(c => c.stage === stage).map(candidate => (
-                                            <div key={candidate.id} onClick={() => setSelectedCandidate(candidate)} className="bg-white p-3 rounded border border-gray-200 cursor-pointer hover:shadow-md">
-                                                <p className="font-medium text-gray-900 text-sm">{candidate.name}</p>
-                                                <p className="text-xs text-gray-500 mt-1">{candidate.email}</p>
-                                                <p className="text-xs font-semibold text-emerald-600 mt-2">Score: {candidate.score}</p>
+                    <div className="flex gap-4 overflow-x-auto pb-4">
+                        {stages.map(stage => {
+                            const stageCandidates = candidates.filter(c => c.stage === stage);
+                            return (
+                                <div key={stage} className="kanban-column bg-gray-50 rounded-xl p-3 border border-gray-200">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{stage}</h3>
+                                        <span className="text-xs bg-gray-200 text-gray-600 rounded-full px-2 py-0.5 font-medium">{stageCandidates.length}</span>
+                                    </div>
+                                    <div className="space-y-2 min-h-8">
+                                        {stageCandidates.map(c => (
+                                            <div key={c.id} onClick={() => setSelected(c)} className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all">
+                                                <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                                                <p className="text-xs text-gray-500 mt-0.5">{c.source || 'Unknown'}</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                                                        <div className="bg-emerald-500 h-1.5 rounded-full" style={{width: (c.score||0)+'%'}} />
+                                                    </div>
+                                                    <span className="text-xs text-gray-500">{c.score||0}</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                    {viewMode === 'table' && (
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Stage</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Score</th>
-                                </tr></thead>
-                                <tbody>
-                                    {filtered.map(candidate => (
-                                        <tr key={candidate.id} onClick={() => setSelectedCandidate(candidate)} className="border-b hover:bg-gray-50 cursor-pointer">
-                                            <td className="px-6 py-4 text-sm">{candidate.name}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-600">{candidate.email}</td>
-                                            <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">{candidate.stage}</span></td>
-                                            <td className="px-6 py-4 text-sm font-medium text-emerald-600">{candidate.score}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    {showAddModal && (
-                        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+                            );
+                        })}
+                    </div>
+                    {showAdd && (
+                        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
                             <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
-                                <h2 className="text-xl font-bold text-gray-900 mb-4">Add Candidate</h2>
-                                <div className="space-y-4">
-                                    <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                                    <input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                                    <input type="tel" placeholder="Phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                                    <select value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                                        {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">Add Candidate</h2>
+                                {['name','email','phone'].map(f => (
+                                    <div key={f} className="mb-3">
+                                        <label className="block text-xs font-medium text-gray-700 mb-1 capitalize">{f === 'name' ? 'Full Name *' : f.charAt(0).toUpperCase()+f.slice(1)}</label>
+                                        <input value={form[f]} onChange={e => setForm(x => ({...x, [f]: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    </div>
+                                ))}
+                                <div className="mb-3">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Source</label>
+                                    <select value={form.source} onChange={e => setForm(x => ({...x, source: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                        {['LinkedIn','Indeed','Referral','Job Board','Career Site','Agent','Other'].map(s => <option key={s}>{s}</option>)}
                                     </select>
                                 </div>
-                                <div className="flex gap-3 mt-6">
-                                    <button onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
-                                    <button onClick={handleAddCandidate} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Add</button>
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Score (0â100)</label>
+                                    <input type="number" min="0" max="100" value={form.score} onChange={e => setForm(x => ({...x, score: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowAdd(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
+                                    <button onClick={addCandidate} disabled={saving || !form.name} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">
+                                        {saving ? <Spinner size={4} /> : null} Add
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     )}
-                    {selectedCandidate && (
-                        <CandidateModal candidate={selectedCandidate} setCandidate={updated => setCandidates(candidates.map(c => c.id === selectedCandidate.id ? updated : c))} templates={templates} onClose={() => setSelectedCandidate(null)} />
+                    {selected && (
+                        <div className="modal-overlay" onClick={() => setSelected(null)}>
+                            <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-900">{selected.name}</h2>
+                                        <p className="text-sm text-gray-500 mt-0.5">{selected.email} {selected.phone ? 'Â· '+selected.phone : ''}</p>
+                                    </div>
+                                    <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
+                                </div>
+                                <div className="flex gap-4 mb-4">
+                                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">Source: {selected.source||'Unknown'}</span>
+                                    <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded">Score: {selected.score||0}</span>
+                                </div>
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-gray-700 mb-2">Move to Stage</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {stages.map(s => (
+                                            <button key={s} onClick={() => moveStage(selected.id, s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${selected.stage === s ? 'emerald-gradient text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-emerald-300'}`}>{s}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-2">Notes</label>
+                                    <textarea defaultValue={selected.notes} onBlur={e => updateNotes(selected.id, e.target.value)} rows={4} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Add notes about this candidate..." />
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             );
         }
 
-        function CandidateModal({ candidate, setCandidate, templates, onClose }) {
-            const [activeTab, setActiveTab] = useState('overview');
-            const [notes, setNotes] = useState(candidate.notes);
-            const [newStage, setNewStage] = useState(candidate.stage);
-            const [showEmailModal, setShowEmailModal] = useState(false);
-            const [emailSubject, setEmailSubject] = useState('');
-            const [emailBody, setEmailBody] = useState('');
-            const [showRejectConfirm, setShowRejectConfirm] = useState(false);
-            const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
-            const handleSaveNotes = () => {
-                setCandidate({...candidate, notes: notes});
-            };
-            const handleMoveStage = () => {
-                setCandidate({...candidate, stage: newStage});
-            };
-            const handleSendEmail = () => {
-                setCandidate({...candidate, emails: candidate.emails.concat([{id: 'e' + Date.now(), subject: emailSubject, body: emailBody, date: new Date().toLocaleDateString()}])});
-                setShowEmailModal(false);
-                setEmailSubject('');
-                setEmailBody('');
-            };
-            const handleReject = () => {
-                setCandidate({...candidate, stage: 'Rejected'});
-                setShowRejectConfirm(false);
-                onClose();
-            };
-            return (
-                <div className="modal-overlay" onClick={onClose}>
-                    <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-start mb-6">
-                            <div><h2 className="text-2xl font-bold text-gray-900">{candidate.name}</h2><p className="text-gray-600 text-sm mt-1">{candidate.email}</p></div>
-                            <button onClick={onClose} className="text-gray-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                        </div>
-                        <div className="flex gap-4 border-b border-gray-200 mb-6">
-                            <button onClick={() => setActiveTab('overview')} className={'pb-3 font-medium ' + (activeTab === 'overview' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-gray-700')}>Overview</button>
-                            <button onClick={() => setActiveTab('notes')} className={'pb-3 font-medium ' + (activeTab === 'notes' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-gray-700')}>Notes</button>
-                            <button onClick={() => setActiveTab('emails')} className={'pb-3 font-medium ' + (activeTab === 'emails' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-gray-700')}>Emails</button>
-                        </div>
-                        {activeTab === 'overview' && (
-                            <div className="space-y-4">
-                                <select value={newStage} onChange={e => setNewStage(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                                    {stages.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                <button onClick={handleMoveStage} className="w-full px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Update Stage</button>
-                                <button onClick={() => setShowEmailModal(true)} className="w-full px-4 py-2 border border-emerald-600 text-emerald-600 rounded hover:bg-emerald-50">Send Email</button>
-                            </div>
-                        )}
-                        {activeTab === 'notes' && (
-                            <div className="space-y-4">
-                                <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none h-32" />
-                                <button onClick={handleSaveNotes} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Save Notes</button>
-                            </div>
-                        )}
-                        {activeTab === 'emails' && (
-                            <div className="space-y-3">
-                                {candidate.emails.length === 0 && <p className="text-gray-500">No emails sent yet</p>}
-                                {candidate.emails.map(email => (
-                                    <div key={email.id} className="bg-gray-50 p-4 rounded">
-                                        <p className="font-medium text-gray-900">{email.subject}</p>
-                                        <p className="text-sm text-gray-600 mt-2">{email.body}</p>
-                                        <p className="text-xs text-gray-500 mt-2">{email.date}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
-                            <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Close</button>
-                            <button onClick={() => setShowRejectConfirm(true)} className="px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50">Reject</button>
-                        </div>
-                        {showEmailModal && (
-                            <div className="modal-overlay" onClick={() => setShowEmailModal(false)}>
-                                <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Send Email</h3>
-                                    <input type="text" placeholder="Subject" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-4" />
-                                    <textarea placeholder="Body" value={emailBody} onChange={e => setEmailBody(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none h-24 mb-4" />
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setShowEmailModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
-                                        <button onClick={handleSendEmail} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded">Send</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {showRejectConfirm && (
-                            <div className="modal-overlay" onClick={() => setShowRejectConfirm(false)}>
-                                <div className="modal-content w-80 p-6" onClick={e => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-gray-900 mb-2">Reject Candidate</h3>
-                                    <p className="text-gray-600 mb-6">Are you sure?</p>
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setShowRejectConfirm(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
-                                        <button onClick={handleReject} className="flex-1 px-4 py-2 bg-red-600 text-white rounded">Reject</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
+        // ââ CANDIDATES OVERVIEW PAGE ââââââââââââââââââââââââââââââââââââââââ
+        function CandidatesOverviewPage() {
+            const { orgId, toast } = useContext(AppCtx);
+            const [candidates, setCandidates] = useState([]);
+            const [pipelines, setPipelines] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [search, setSearch] = useState('');
+            const [stageFilter, setStageFilter] = useState('All');
+            const [selected, setSelected] = useState(null);
+            const [showAdd, setShowAdd] = useState(false);
+            const [form, setForm] = useState({ name:'', email:'', phone:'', source:'LinkedIn', pipeline_id:'', stage:'Applied', score:70 });
+            const [saving, setSaving] = useState(false);
+            const stages = ['All','Applied','Screening','Interview','Technical','Final Round','Offer','Hired','Rejected'];
 
-        function CandidatesOverviewPage({ candidates, setCandidates, templates }) {
-            const [searchQuery, setSearchQuery] = useState('');
-            const [selectedCandidate, setSelectedCandidate] = useState(null);
-            const filtered = candidates.filter(c => c.name.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1 || c.email.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1);
-            return (
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Candidates</h1>
-                    <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-6" />
-                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b"><tr>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Pipeline</th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Stage</th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Score</th>
-                            </tr></thead>
-                            <tbody>
-                                {filtered.map(candidate => (
-                                    <tr key={candidate.id} onClick={() => setSelectedCandidate(candidate)} className="border-b hover:bg-gray-50 cursor-pointer">
-                                        <td className="px-6 py-4 text-sm">{candidate.name}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{candidate.email}</td>
-                                        <td className="px-6 py-4 text-sm">{candidate.pipeline}</td>
-                                        <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">{candidate.stage}</span></td>
-                                        <td className="px-6 py-4 text-sm font-medium text-emerald-600">{candidate.score}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    {selectedCandidate && (
-                        <CandidateModal candidate={selectedCandidate} setCandidate={updated => setCandidates(candidates.map(c => c.id === selectedCandidate.id ? updated : c))} templates={templates} onClose={() => setSelectedCandidate(null)} />
-                    )}
-                </div>
-            );
-        }
+            const load = useCallback(async () => {
+                if (!orgId) return;
+                const [{ data: c }, { data: p }] = await Promise.all([
+                    sb.from('candidates').select('*').eq('org_id', orgId).order('created_at', {ascending: false}),
+                    sb.from('pipelines').select('id,name').eq('org_id', orgId).eq('status','Active')
+                ]);
+                setCandidates(c||[]); setPipelines(p||[]); setLoading(false);
+            }, [orgId]);
 
-        function DuplicatesPage() {
-            const [toastMessage, setToastMessage] = useState('');
-            const duplicateGroups = [
-                { id: 'd1', candidates: ['John Smith', 'Jon Smith'], similarity: 95 },
-                { id: 'd2', candidates: ['Sarah Johnson', 'Sara Johnson'], similarity: 92 }
-            ];
-            return (
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Duplicate Candidates</h1>
-                    {duplicateGroups.map(group => (
-                        <div key={group.id} className="bg-white rounded-lg p-6 border border-gray-200 flex justify-between items-center mb-4">
-                            <div><p className="font-semibold text-gray-900">{group.candidates[0]} vs {group.candidates[1]}</p><p className="text-sm text-gray-600">Similarity: {group.similarity}%</p></div>
-                            <button onClick={() => setToastMessage('Merged')} className="px-4 py-2 bg-emerald-600 text-white rounded">Merge</button>
-                        </div>
-                    ))}
-                    {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
-                </div>
-            );
-        }
+            useEffect(() => { load(); }, [load]);
 
-        function TemplatesPage({ templates, setTemplates }) {
-            const [toastMessage, setToastMessage] = useState('');
-            const [showCreateModal, setShowCreateModal] = useState(false);
-            const [formData, setFormData] = useState({ name: '', subject: '', body: '' });
-            const handleCreateTemplate = () => {
-                if (formData.name && formData.subject && formData.body) {
-                    setTemplates(templates.concat([{
-                        id: 't' + Date.now(),
-                        name: formData.name,
-                        subject: formData.subject,
-                        body: formData.body,
-                        variables: [],
-                        system: false
-                    }]));
-                    setFormData({ name: '', subject: '', body: '' });
-                    setShowCreateModal(false);
-                    setToastMessage('Template created');
-                }
+            const filtered = candidates.filter(c => {
+                const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.email||'').toLowerCase().includes(search.toLowerCase());
+                const matchStage = stageFilter === 'All' || c.stage === stageFilter;
+                return matchSearch && matchStage;
+            });
+
+            const addCandidate = async () => {
+                if (!form.name.trim()) return;
+                setSaving(true);
+                const pipeline = pipelines.find(p => p.id === form.pipeline_id);
+                const { data, error } = await sb.from('candidates').insert({ org_id: orgId, name: form.name, email: form.email, phone: form.phone, source: form.source, pipeline_id: form.pipeline_id || null, pipeline_name: pipeline?.name || null, stage: form.stage, score: parseInt(form.score)||70, notes: '' }).select().single();
+                if (error) { toast(error.message, 'error'); } else { setCandidates(c => [data, ...c]); toast('Candidate added'); }
+                setForm({ name:'', email:'', phone:'', source:'LinkedIn', pipeline_id:'', stage:'Applied', score:70 }); setShowAdd(false); setSaving(false);
             };
-            const handleDeleteTemplate = (id) => {
-                setTemplates(templates.filter(t => t.id !== id));
-                setToastMessage('Deleted');
+
+            const deleteCandidate = async (id) => {
+                const { error } = await sb.from('candidates').delete().eq('id', id);
+                if (error) { toast(error.message, 'error'); return; }
+                setCandidates(c => c.filter(x => x.id !== id)); setSelected(null); toast('Candidate removed');
             };
+
+            const updateStage = async (id, stage) => {
+                const { error } = await sb.from('candidates').update({ stage }).eq('id', id);
+                if (error) { toast(error.message, 'error'); return; }
+                setCandidates(c => c.map(x => x.id === id ? {...x, stage} : x));
+                if (selected?.id === id) setSelected(s => ({...s, stage}));
+                toast('Stage updated');
+            };
+
+            const updateNotes = async (id, notes) => {
+                await sb.from('candidates').update({ notes }).eq('id', id);
+                setCandidates(c => c.map(x => x.id === id ? {...x, notes} : x));
+            };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
             return (
                 <div className="p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-2xl font-bold text-gray-900">Templates</h1>
-                        <button onClick={() => setShowCreateModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded">New</button>
+                        <h1 className="text-2xl font-bold text-gray-900">Candidates <span className="text-gray-400 font-normal text-lg ml-1">{candidates.length}</span></h1>
+                        <button onClick={() => setShowAdd(true)} className="emerald-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Candidate</button>
                     </div>
-                    <div className="grid grid-cols-3 gap-6">
-                        {templates.map(t => (
-                            <div key={t.id} className="bg-white rounded-lg p-6 border border-gray-200">
-                                <div className="flex justify-between items-start mb-3">
-                                    <h3 className="font-semibold text-gray-900">{t.name}</h3>
-                                    {!t.system && <button onClick={() => handleDeleteTemplate(t.id)} className="text-red-600 text-sm">Delete</button>}
-                                </div>
-                                <p className="text-sm text-gray-600 mb-3">{t.subject}</p>
-                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">{t.system === true ? 'System' : 'Custom'}</span>
-                            </div>
-                        ))}
+                    <div className="flex gap-3 mb-4">
+                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search candidates..." className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            {stages.map(s => <option key={s}>{s}</option>)}
+                        </select>
                     </div>
-                    {showCreateModal && (
-                        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
-                                <h2 className="text-xl font-bold text-gray-900 mb-4">Create Template</h2>
-                                <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded mb-4" />
-                                <input type="text" placeholder="Subject" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded mb-4" />
-                                <textarea placeholder="Body" value={formData.body} onChange={e => setFormData({...formData, body: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded mb-4 h-24" />
-                                <div className="flex gap-3">
-                                    <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
-                                    <button onClick={handleCreateTemplate} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded">Create</button>
-                                </div>
-  2                         </div>
-                        </div>
-                    )}
-                    {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
-                </div>
-            );
-        }
-
-        function NovaPage() {
-            const [selectedSession, setSelectedSession] = useState(null);
-            const novaSessions = generateNovaData();
-            return (
-                <div className="p-6">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova AI Screening</h1>
-                    <div className="grid grid-cols-4 gap-6 mb-6">
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Enabled Pipelines</p><p className="text-3xl font-bold text-emerald-600">6</p></div>
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Total Sessions</p><p className="text-3xl font-bold text-emerald-600">6</p></div>
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Completed</p><p className="text-3xl font-bold text-emerald-600">5</p></div>
-                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Pass Rate</p><p className="text-3xl font-bold text-emerald-600">60%</p></div>
-                    </div>
-                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                         <table className="w-full">
-                            <thead className="bg-gray-50 border-b"><tr>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Candidate</th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Score</th>
-                                <th className="px-6 py-3 text-left text-sm font-semibold">Status</th>
-                            </tr></thead>
-                            <tbody>
-                                {novaSessions.map(s => (
-                                    <tr key={s.id} onClick={() => setSelectedSession(s)} className="border-b hover:bg-gray-50 cursor-pointer">
-                                        <td className="px-6 py-4 text-sm">{s.candidateName}</td>
-                                        <td className="px-6 py-4 text-sm font-medium text-emerald-600">{s.score}</td>
-                                        <td className="px-6 py-4 text-sm"><span className={'px-2 py-1 text-xs rounded ' + (s.status === 'Passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>{s.status}</span></td>
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>{['Name','Pipeline','Stage','Source','Score','Added'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">{h}</th>)}</tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {filtered.map(c => (
+                                    <tr key={c.id} onClick={() => setSelected(c)} className="hover:bg-gray-50 cursor-pointer">
+                                        <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">{c.name.charAt(0)}</div><div><p className="text-sm font-medium text-gray-900">{c.name}</p><p className="text-xs text-gray-500">{c.email}</p></div></div></td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{c.pipeline_name || 'â'}</td>
+                                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${c.stage==='Hired'?'bg-emerald-100 text-emerald-700':c.stage==='Rejected'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-700'}`}>{c.stage}</span></td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{c.source||'<Zò¢Ã·'}</td>
+                                        <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-16 bg-gray-100 rounded-full h-1.5"><div className="bg-emerald-500 h-1.5 rounded-full" style={{width:(c.score||0)+'%'}}/></div><span className="text-xs text-gray-600">{c.score||0}</span></div></td>
+                                        <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        {filtered.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">{search || stageFilter !== 'All' ? 'No candidates match your filters' : 'No candidates yet. Add your first one!'}</div>}
                     </div>
-                    {selectedSession && (
-                        <div className="modal-overlay" onClick={() => setSelectedSession(null)}>
-                            <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
-                                <h2 className="text-2xl font-bold text-gray-900">{selectedSession.candidateName}</h2>
-                                <p className="text-gray-600 mt-2">Score: {selectedSession.score} | Status: {selectedSession.status}</p>
-                                <h3 className="font-semibold text-gray-900 mt-6 mb-4">Q&A Review</h3>
-                                {selectedSession.questions.map((q, i) => (
-                                    <div key={i} className="bg-gray-50 p-4 rounded mb-4">
-                                        <p className="font-medium text-gray-900">Q: {q.q}</p>
-                                        <p className="text-gray-700 mt-2">A: {q.a}</p>
-                                        <p className="text-xs text-gray-500 mt-2">Score: {q.score}</p>
-                                    </div>
+                    {showAdd && (
+                        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">Add Candidate</h2>
+                                {[['name','Full Name *'],['email','Email'],['phone','Phone']].map(([f,l]) => (
+                                    <div key={f} className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">{l}</label><input value={form[f]} onChange={e => setForm(x => ({...x, [f]: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                                 ))}
-                                <button onClick={() => setSelectedSession(null)} className="w-full px-4 py-2 bg-emerald-600 text-white rounded mt-6">Close</button>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Pipeline</label><select value={form.pipeline_id} onChange={e => setForm(x => ({...x, pipeline_id: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">â No pipeline â</option>{pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Source</label><select value={form.source} onChange={e => setForm(x => ({...x, source: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['LinkedIn','Indeed','Referral','Job Board','Career Site','Agent','Other'].map(s => <option key={s}>{s}</option>)}</select></div>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Stage</label><select value={form.stage} onChange={e => setForm(x => ({...x, stage: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['Applied','Screening','Interview','Technical','Final Round','Offer','Hired','Rejected'].map(s => <option key={s}>{s}</option>)}</select></div>
+                                <div className="mb-4"><label className="block text-xs font-medium text-gray-700 mb-1">Score (0â100)</label><input type="number" min="0" max="100" value={form.score} onChange={e => setForm(x => ({...x, score: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                                <div className="flex gap-3"><button onClick={() => setShowAdd(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button onClick={addCandidate} disabled={saving||!form.name} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null} Add</button></div>
+                            </div>
+                        </div>
+                    )}
+                    {selected && (
+                        <div className="modal-overlay" onClick={() => setSelected(null)}>
+                            <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div><h2 className="text-xl font-bold text-gray-900">{selected.name}</h2><p className="text-sm text-gray-500 mt-0.5">{selected.email} {selected.phone ? 'Â· '+selected.phone : ''}</p></div>
+                                    <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mb-4">{['Applied','Screening','Interview','Technical','Final Round','Offer','Hired','Rejected'].map(s => <button key={s} onClick={() => updateStage(selected.id, s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${selected.stage===s?'emerald-gradient text-white border-transparent':'border-gray-200 text-gray-600 hover:border-emerald-300'}`}>{s}</button>)}</div>
+                                <div className="mb-4"><label className="block text-xs font-medium text-gray-700 mb-2">Notes</label><textarea defaultValue={selected.notes} onBlur={e => updateNotes(selected.id, e.target.value)} rows={4} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Add notes..." /></div>
+                                <button onClick={() => deleteCandidate(selected.id)} className="text-red-600 text-sm hover:text-red-700">Delete candidate</button>
                             </div>
                         </div>
                     )}
@@ -615,132 +671,395 @@
             );
         }
 
-        function OrganisationPage({ tab, teamMembers, setTeamMembers }) {
-            const [toastMessage, setToastMessage] = useState('');
-            const [showInviteModal, setShowInviteModal] = useState(false);
-            const [inviteEmail, setInviteEmail] = useState('');
-            const handleInviteMember = () => {
-                if (inviteEmail) {
-                    setTeamMembers(teamMembers.concat([{
-                        id: 'tm' + Date.now(),
-                        name: inviteEmail.split('@')[0],
-                        email: inviteEmail,
-                        role: 'Recruiter',
-                        assigned: 0,
-                        hired: 0,
-                        conversion: '0%'
-                    }]));
-                    setInviteEmail('');
-                    setShowInviteModal(false);
-                    setToastMessage('Invited');
+        // ââ DUPLICATES PAGE âââââââââââââââââââââââââââââââââââââââââââââââââ
+        function DuplicatesPage() {
+            const { orgId, toast } = useContext(AppCtx);
+            const [dupes, setDupes] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                if (!orgId) return;
+                const load = async () => {
+                    const { data } = await sb.from('candidates').select('id,name,email,pipeline_name,stage').eq('org_id', orgId);
+                    const emailMap = {};
+                    (data||[]).forEach(c => { if (c.email) { if (!emailMap[c.email.toLowerCase()]) emailMap[c.email.toLowerCase()] = []; emailMap[c.email.toLowerCase()].push(c); } });
+                    setDupes(Object.values(emailMap).filter(g => g.length > 1));
+                    setLoading(false);
+                };
+                load();
+            }, [orgId]);
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
+            return (
+                <div className="p-6">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Duplicate Candidates</h1>
+                    {dupes.length === 0 ? (
+                        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center"><p className="text-emerald-600 font-medium text-lg">No duplicates found</p><p className="text-sm text-gray-500 mt-1">Your candidate database is clean</p></div>
+                    ) : dupes.map((group, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-orange-200 p-4 mb-3 shadow-sm">
+                            <p className="text-xs font-semibold text-orange-600 mb-2 uppercase">Duplicate: {group[0].email}</p>
+                            {group.map(c => <div key={c.id} className="flex justify-between items-center py-2 border-b last:border-0"><span className="text-sm text-gray-900">{c.name}</span><span className="text-xs text-gray-500">{c.pipeline_name||'No pipeline'} Â· {c.stage}</span></div>)}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        // ââ TEMPLATES PAGE ââââââââââââââââââââââââââââââââââââââââââââââââââ
+        function TemplatesPage() {
+            const { orgId, toast } = useContext(AppCtx);
+            const [templates, setTemplates] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selected, setSelected] = useState(null);
+            const [showAdd, setShowAdd] = useState(false);
+            const [form, setForm] = useState({ name:'', subject:'', body:'', variables:'' });
+            const [saving, setSaving] = useState(false);
+            const [editing, setEditing] = useState(false);
+
+            const load = useCallback(async () => {
+                if (!orgId) return;
+                const { data } = await sb.from('templates').select('*').eq('org_id', orgId).order('created_at');
+                setTemplates(data||[]); setLoading(false);
+            }, [orgId]);
+
+            useEffect(() => { load(); }, [load]);
+
+            const saveTemplate = async () => {
+                if (!form.name || !form.subject) return;
+                setSaving(true);
+                const vars = form.variables ? form.variables.split(',').map(v => v.trim()).filter(Boolean) : [];
+                const payload = { org_id: orgId, name: form.name, subject: form.subject, body: form.body, variables: vars, is_system: false };
+                if (editing) {
+                    const { error } = await sb.from('templates').update(payload).eq('id', editing);
+                    if (error) { toast(error.message, 'error'); } else { setTemplates(t => t.map(x => x.id === editing ? {...x, ...payload} : x)); toast('Template saved'); }
+                } else {
+                    const { data, error } = await sb.from('templates').insert(payload).select().single();
+                    if (error) { toast(error.message, 'error'); } else { setTemplates(t => [...t, data]); toast('Template created'); }
                 }
+                setForm({ name:'', subject:'', body:'', variables:'' }); setShowAdd(false); setEditing(false); setSaving(false);
             };
-            const handleRemoveMember = (id) => {
-                setTeamMembers(teamMembers.filter(m => m.id !== id));
-                setToastMessage('Removed');
+
+            const deleteTemplate = async (id) => {
+                const { error } = await sb.from('templates').delete().eq('id', id);
+                if (error) { toast(error.message, 'error'); return; }
+                setTemplates(t => t.filter(x => x.id !== id)); setSelected(null); toast('Template deleted');
             };
-            if (tab === 'members') {
-                return (
-                    <div className="p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h1 className="text-2xl font-bold text-gray-900">Members</h1>
-                            <button onClick={() => setShowInviteModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded">Invite</button>
-                        </div>
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Role</th>
-                                    <th className="px-6 py-3 text-right text-sm font-semibold">Action</th>
-                                </tr></thead>
-                                <tbody>
-                                    {teamMembers.map(m => (
-                                        <tr key={m.id} className="border-b hover:bg-gray-50">
-                                            <td className="px-6 py-4 text-sm">{m.name}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
-                                            <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">{m.role}</span></td>
-                                            <td className="px-6 py-4 text-right"><button onClick={() => handleRemoveMember(m.id)} className="text-red-600 text-sm">Remove</button></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        {showInviteModal && (
-                            <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
-                                <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
-                                    <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Member</h2>
-                                    <input type="email" placeholder="Email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded mb-4" />
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setShowInviteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
-                                        <button onClick={handleInviteMember} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded">Invite</button>
-                                    </div>
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
+            return (
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
+                        <button onClick={() => { setForm({ name:'', subject:'', body:'', variables:'' }); setEditing(false); setShowAdd(true); }} className="emerald-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">+ New Template</button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        {templates.map(t => (
+                            <div key={t.id} onClick={() => setSelected(t)} className="bg-white rounded-xl border border-gray-200 p-5 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all shadow-sm">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="font-semibold text-gray-900 text-sm">{t.name}</h3>
+                                    {t.is_system && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">System</span>}
                                 </div>
+                                <p className="text-xs text-gray-500 mb-3 truncate">{t.subject}</p>
+                                <p className="text-xs text-gray-400 line-clamp-2">{t.body}</p>
+                                {(t.variables||[]).length > 0 && <div className="flex flex-wrap gap-1 mt-3">{(t.variables||[]).map(v => <span key={v} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">{'{{'+v+'}}'}</span>)}</div>}
                             </div>
-                        )}
-                        {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
+                        ))}
+                        {templates.length === 0 && <div className="col-span-3 text-center py-12 text-gray-400 text-sm">No templates yet. Create your first email template.</div>}
                     </div>
-                );
-            }
-            if (tab === 'leaderboard') {
-                return (
-                    <div className="p-6">
-                        <h1 className="text-2xl font-bold text-gray-900 mb-6">Leaderboard</h1>
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Rank</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Hired</th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold">Conversion</th>
-                                </tr></thead>
-                                <tbody>
-                                    {teamMembers.map((m, i) => (
-                                        <tr key={m.id} className="border-b hover:bg-gray-50">
-                                            <td className="px-6 py-4 text-sm font-bold">{i + 1}</td>
-                                            <td className="px-6 py-4 text-sm">{m.name}</td>
-                                            <td className="px-6 py-4 text-sm font-medium text-emerald-600">{m.hired}</td>
-                                            <td className="px-6 py-4 text-sm">{m.conversion}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    {(showAdd || editing) && (
+                        <div className="modal-overlay" onClick={() => { setShowAdd(false); setEditing(false); }}>
+                            <div className="modal-content w-2xl p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">{editing ? 'Edit Template' : 'New Template'}</h2>
+                                {[['name','Template Name *'],['subject','Subject Line *']].map(([f,l]) => (
+                                    <div key={f} className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">{l}</label><input value={form[f]} onChange={e => setForm(x => ({...x, [f]: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                                ))}
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Body</label><textarea value={form.body} onChange={e => setForm(x => ({...x, body: e.target.value}))} rows={5} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Use {{variable_name}} for dynamic fields" /></div>
+                                <div className="mb-4"><label className="block text-xs font-medium text-gray-700 mb-1">Variables (comma-separated)</label><input value={form.variables} onChange={e => setForm(x => ({...x, variables: e.target.value}))} placeholder="candidate_name, date, position" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                                <div className="flex gap-3"><button onClick={() => { setShowAdd(false); setEditing(false); }} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button onClick={saveTemplate} disabled={saving||!form.name||!form.subject} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null} Save</button></div>
+                            </div>
                         </div>
+                    )}
+                    {selected && !editing && (
+                        <div className="modal-overlay" onClick={() => setSelected(null)}>
+                            <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <h2 className="text-xl font-bold text-gray-900">{selected.name}</h2>
+                                    <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
+                                </div>
+                                <p className="text-sm font-medium text-gray-700 mb-1">Subject</p>
+                                <p className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded mb-4">{selected.subject}</p>
+                                <p className="text-sm font-medium text-gray-700 mb-1">Body</p>
+                                <pre className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded whitespace-pre-wrap mb-4 font-sans">{selected.body}</pre>
+                                x(selected.variables||[]).length > 0 && <div className="flex flex-wrap gap-1 mb-4">{selected.variables.map(v => <span key={v} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">{'{{'+v+'}}'}</span>)}</div>}
+                                {!selected.is_system && (
+                                    <div className="flex gap-3">
+                                        <button onClick={() => { setForm({ name:selected.name, subject:selected.subject, body:selected.body, variables:(selected.variables||[]).join(', ') }); setEditing(selected.id); setSelected(null); setShowAdd(false); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Edit</button>
+                                        <button onClick={() => deleteTemplate(selected.id)} className="px-4 py-2 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-50">Delete</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ââ NOVA PAGE âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        function NovaPage() {
+            const { orgId, toast } = useContext(AppCtx);
+            const [sessions, setSessions] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [selected, setSelected] = useState(null);
+            const [showAdd, setShowAdd] = useState(false);
+            const [form, setForm] = useState({ candidate_name:'', score:80, status:'Passed', question:'', answer:'' });
+            const [saving, setSaving] = useState(false);
+
+            const load = useCallback(async () => {
+                if (!orgId) return;
+                const { data } = await sb.from('nova_sessions').select('*').eq('org_id', orgId).order('created_at', {ascending:false});
+                setSessions(data||[]); setLoading(false);
+            }, [orgId]);
+
+            useEffect(() => { load(); }, [load]);
+
+            const addSession = async () => {
+                if (!form.candidate_name) return;
+                setSaving(true);
+                const { data, error } = await sb.from('nova_sessions').insert({ org_id: orgId, candidate_name: form.candidate_name, score: parseInt(form.score)||80, status: form.status, session_date: new Date().toISOString().split('T')[0], questions: form.question ? [{ q: form.question, a: form.answer, score: parseInt(form.score)||80 }] : [] }).select().single();
+                if (error) { toast(error.message, 'error'); } else { setSessions(s => [data, ...s]); toast('Session added'); }
+                setForm({ candidate_name:'', score:80, status:'Passed', question:'', answer:'' }); setShowAdd(false); setSaving(false);
+            };
+
+            const stats = { total: sessions.length, passed: sessions.filter(s => s.status==='Passed').length, avg: sessions.length > 0 ? Math.round(sessions.reduce((a,s) => a + (s.score||0), 0) / sessions.length) : 0 };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
+            return (
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Nova AI Screening</h1>
+                        <button onClick={() => setShowAdd(true)} className="emerald-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">+ Log Session</button>
                     </div>
-                );
-            }
+                    <div className="grid grid-cols-4 gap-4 mb-6">
+                        {[['Enabled Pipelines','Active',stats.total],['Total Sessions','Total',stats.total],['Completed','Completed',stats.passed],['Pass Rate','Pass Rate', stats.total > 0 ? Math.round((stats.passed/stats.total)*100)+'%' : '0%']].map(([l,,v]) => (
+                            <div key={l} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm"><p className="text-sm text-gray-600">{l}</p><p className="text-3xl font-bold text-emerald-600 mt-1">{v}</p></div>
+                        ))}
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>{['Candidate','Score','Status','Date'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {sessions.map(s => (
+                                    <tr key={s.id} onClick={() => setSelected(s)} className="hover:bg-gray-50 cursor-pointer">
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{s.candidate_name}</td>
+                                        <td className="px-6 py-4 text-sm font-semibold text-emerald-600">{s.score}</td>
+                                        <td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded-full font-medium ${s.status==='Passed'?'bg-green-100 text-green-700':s.status==='Failed'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700'}`}>{s.status}</span></td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{s.session_date}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {sessions.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No screening sessions yet</div>}
+                    </div>
+                    {showAdd && (
+                        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">Log Screening Session</h2>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Candidate Name *</label><input value={form.candidate_name} onChange={e => setForm(x=>({...x,candidate_name:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Score (0â100)</label><input type="number" value={form.score} onChange={e => setForm(x=>({...x,score:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Status</label><select value={form.status} onChange={e => setForm(x=>({...x,status:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['Passed','Failed','Pending'].map(s=><option key={s}>{s}</option>)}</select></div>
+                                <div className="flex gap-3"><button onClick={() => setShowAdd(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button onClick={addSession} disabled={saving||!form.candidate_name} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null} Save</button></div>
+                            </div>
+                        </div>
+                    )}
+                    {selected && (
+                        <div className="modal-overlay" onClick={() => setSelected(null)}>
+                            <div className="modal-content w-lg p-8" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-bold text-gray-900 mb-1">{selected.candidate_name}</h2>
+                                <p className="text-gray-500 text-sm mb-4">Score: {selected.score} Â· Status: {selected.status} Â· {selected.session_date}</p>
+                                {(selected.questions||[]).length > 0 && (<><h3 className="font-semibold text-gray-900 mb-3">Q&A Review</h3>{selected.questions.map((q,i) => <div key={i} className="bg-gray-50 p-4 rounded mb-3"><p className="font-medium text-gray-900 text-sm">Q: {q.q}</p><p className="text-gray-700 mt-1 text-sm">A: {q.a}</p><p className="text-xs text-gray-400 mt-1">Score: {q.score}</p></div>)}</>)}
+                                <button onClick={() => setSelected(null)} className="w-full py-2 emerald-gradient text-white rounded-lg mt-4 text-sm">Close</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ââ ORGANISATION PAGE ââââââââââââââââââââââââââââââââââââââââââââââââ
+        function OrganisationPage({ tab }) {
+            const { orgId, toast } = useContext(AppCtx);
+            const [members, setMembers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [showInvite, setShowInvite] = useState(false);
+            const [inviteEmail, setInviteEmail] = useState('');
+            const [inviteRole, setInviteRole] = useState('Recruiter');
+            const [saving, setSaving] = useState(false);
+
+            const load = useCallback(async () => {
+                if (!orgId) return;
+                const { data } = await sb.from('profiles').select('*').eq('org_id', orgId).order('created_at');
+                setMembers(data||[]); setLoading(false);
+            }, [orgId]);
+
+            useEffect(() => { load(); }, [load]);
+
+            const inviteMember = async () => {
+                if (!inviteEmail) return;
+                setSaving(true);
+                // Sign up via Supabase Auth â they'll get an email confirmation
+                const { data: { user }, error } = await sb.auth.admin ?
+                    { data: { user: null }, error: { message: 'Use Supabase dashboard to invite users with admin rights' } } :
+                    await sb.auth.signUp({ email: inviteEmail, password: Math.random().toString(36).slice(2) + 'Tf1!' });
+                // For now, create a pending profile record
+                const { error: pErr } = await sb.from('profiles').insert({ id: user?.id || crypto.randomUUID(), org_id: orgId, email: inviteEmail, name: inviteEmail.split('@')[0], role: inviteRole });
+                if (pErr) { toast('Invite saved locally. Ask them to sign up at your TalentFlow URL.', 'info'); } else { toast('Member invited'); }
+                await load(); setInviteEmail(''); setShowInvite(false); setSaving(false);
+            };
+
+            const removeMember = async (id) => {
+                const { error } = await sb.from('profiles').delete().eq('id', id);
+                if (error) { toast(error.message, 'error'); return; }
+                setMembers(m => m.filter(x => x.id !== id)); toast('Member removed');
+            };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
+            if (tab === 'members') return (
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Members</h1>
+                        <button onClick={() => setShowInvite(true)} className="emerald-gradient text-white px-4 py-2 rounded-lg text-sm font-medium">+ Invite Member</button>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>{['Name','Email','Role','Joined','Action'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {members.map(m => (
+                                    <tr key={m.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{m.name}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{m.email}</td>
+                                        <td className="px-6 py-4"><span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">{m.role}</span></td>
+                                        <td className="px-6 py-4 text-xs text-gray-400">{new Date(m.created_at).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4"><button onClick={() => removeMember(m.id)} className="text-red-500 text-sm hover:text-red-700">Remove</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {members.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No team members yet</div>}
+                    </div>
+                    {showInvite && (
+                        <div className="modal-overlay" onClick={() => setShowInvite(false)}>
+                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-lg font-bold text-gray-900 mb-4">Invite Member</h2>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Email</label><input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                                <div className="mb-4"><label className="block text-xs font-medium text-gray-700 mb-1">Role</label><select value={inviteRole} onChange={e => setInviteRole(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['Admin','Recruiter','Hiring Manager','Coordinator'].map(r=><option key={r}>{r}</option>)}</select></div>
+                                <div className="flex gap-3"><button onClick={() => setShowInvite(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button onClick={inviteMember} disabled={saving} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">{saving?<Spinner size={4}/>:null} Invite</button></div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+
+            if (tab === 'leaderboard') return (
+                <div className="p-6">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Leaderboard</h1>
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>{['Rank','Name','Role','Email'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {members.map((m,i) => (
+                                    <tr key={m.id} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 text-sm font-bold text-gray-900">#{i+1}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{m.name}</td>
+                                        <td className="px-6 py-4"><span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">{m.role}</span></td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{m.email}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {members.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No team members yet</div>}
+                    </div>
+                </div>
+            );
+
             return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">{tab}</h1></div>;
         }
 
+        // ââ APP ROOT âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
         function App() {
+            const [user, setUser] = useState(null);
+            const [profile, setProfile] = useState(null);
+            const [authLoading, setAuthLoading] = useState(true);
             const [currentPage, setCurrentPage] = useState('dashboard');
             const [pageParams, setPageParams] = useState({});
-            const [candidates, setCandidates] = useState(generateCandidates());
-            const [templates, setTemplates] = useState(generateTemplates());
-            const [teamMembers, setTeamMembers] = useState(generateTeamMembers());
+            const [toasts, setToasts] = useState([]);
 
-            const handleNavigate = (page, params) => {
-                setCurrentPage(page);
-                setPageParams(params || {});
-            };
+            const showToast = useCallback((message, type = 'success') => {
+                const id = Date.now();
+                setToasts(t => [...t, { id, message, type }]);
+                setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 4500);
+            }, []);
+
+            const loadProfile = useCallback(async (uid) => {
+                const { data } = await sb.from('profiles').select('*').eq('id', uid).single();
+                setProfile(data || null);
+            }, []);
+
+            useEffect(() => {
+                sb.auth.getSession().then(({ data: { session } }) => {
+                    if (session?.user) { setUser(session.user); loadProfile(session.user.id); }
+                    setAuthLoading(false);
+                });
+                const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+                    if (session?.user) { setUser(session.user); await loadProfile(session.user.id); }
+                    else { setUser(null); setProfile(null); }
+                    if (event === 'SIGNED_IN') setCurrentPage('dashboard');
+                });
+                return () => subscription.unsubscribe();
+            }, [loadProfile]);
+
+            const navigate = (page, params = {}) => { setCurrentPage(page); setPageParams(params); };
+
+            if (authLoading) return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center"><Spinner size={10} /><p className="text-gray-500 text-sm mt-3">Loading TalentFlow...</p></div>
+                </div>
+            );
+
+            if (!user) return <AuthPage />;
+
+            const orgId = profile?.org_id || null;
 
             const renderPage = () => {
                 if (currentPage === 'dashboard') return <DashboardPage />;
-                if (currentPage === 'pipelines') return <PipelinesPage onNavigate={handleNavigate} />;
-                if (currentPage.indexOf('pipeline-detail') === 0) return <PipelineDetailPage pipelineName={pageParams} candidates={candidates} setCandidates={setCandidates} templates={templates} onBack={() => handleNavigate('pipelines')} />;
-                if (currentPage === 'candidates-overview') return <CandidatesOverviewPage candidates={candidates} setCandidates={setCandidates} templates={templates} />;
+                if (currentPage === 'pipelines') return <PipelinesPage onNavigate={navigate} />;
+                if (currentPage.startsWith('pipeline-detail')) return <PipelineDetailPage pipeline={pageParams} onBack={() => navigate('pipelines')} />;
+                if (currentPage === 'candidates-overview') return <CandidatesOverviewPage />;
                 if (currentPage === 'candidates-duplicates') return <DuplicatesPage />;
-                if (currentPage === 'templates') return <TemplatesPage templates={templates} setTemplates={setTemplates} />;
+                if (currentPage === 'templates') return <TemplatesPage />;
                 if (currentPage === 'nova') return <NovaPage />;
-                if (currentPage.indexOf('org-') === 0) return <OrganisationPage tab={currentPage.replace('org-', '')} teamMembers={teamMembers} setTeamMembers={setTeamMembers} />;
+                if (currentPage.startsWith('org-')) return <OrganisationPage tab={currentPage.replace('org-','')} />;
                 return <DashboardPage />;
             };
 
             return (
-                <div className="min-h-screen bg-gray-50">
-                    <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
-                    {renderPage()}
-                </div>
+                <AppCtx.Provider value={{ orgId, user, profile, toast: showToast }}>
+                    <div className="min-h-screen bg-gray-50">
+                        <Navbar currentPage={currentPage} onNavigate={navigate} />
+                        {!orgId && (
+                            <div className="bg-yellow-50 border-b border-zellow-200 px-6 py-2 text-sm text-yellow-800 text-center">
+                                Setting up your workspace... If this persists, please sign out and sign back in.
+                            </div>
+                        )}
+                        {renderPage()}
+                    </div>
+                    <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
+                        {toasts.map(t => <Toast key={t.id} message={t.message} type={t.type} onDismiss={() => setToasts(x => x.filter(i => i.id !== t.id))} />)}
+                    </div>
+                </AppCtx.Provider>
             );
         }
 
