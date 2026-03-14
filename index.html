@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentFlow.ai - ATS Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background-color: #f8faf8; }
+        .emerald-gradient { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .nav-dropdown { position: absolute; top: 100%; left: 0; background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 50; min-width: 200px; }
+        .kanban-column { min-width: 260px; flex-shrink: 0; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: white; border-left: 4px solid #10b981; padding: 1rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1100; animation: slideIn 0.3s ease-in-out; }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        const generateCandidates = () => {
+            const firstNames = ['Olivia', 'Liam', 'Emma', 'Noah', 'Ava', 'Ethan', 'Sophia', 'Mason', 'Isabella', 'Lucas'];
+            const lastNames = ['Chen', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+            const sources = ['LinkedIn', 'Indeed', 'Referral', 'Job Board', 'Career Site', 'Agent'];
+            const pipelines = ['Senior Frontend Dev', 'Product Manager', 'UX Designer', 'Data Analyst', 'DevOps Engineer', 'Marketing Lead'];
+            const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
+            const candidates = [];
+            for (let i = 0; i < 120; i++) {
+                candidates.push({
+                    id: 'c' + i,
+                    name: firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)],
+                    email: 'candidate' + i + '@example.com',
+                    phone: '+1 (' + Math.floor(Math.random() * 900 + 200) + ') ' + Math.floor(Math.random() * 900 + 100) + '-' + Math.floor(Math.random() * 9000 + 1000),
+                    pipeline: pipelines[Math.floor(Math.random() * pipelines.length)],
+                    stage: stages[Math.floor(Math.random() * stages.length)],
+                    score: Math.floor(Math.random() * 61 + 40),
+                    source: sources[Math.floor(Math.random() * sources.length)],
+                    notes: '',
+                    emails: []
+                });
+            }
+            return candidates;
+        };
+
+        const generateTemplates = () => [
+            { id: 't1', name: 'Screening Invitation', subject: 'Schedule Your Screening Assessment', body: 'Hi {{candidate_name}}, We would like to invite you to complete our screening assessment. {{screening_link}}', variables: ['candidate_name', 'screening_link'], system: true },
+            { id: 't2', name: 'Interview Confirmation', subject: 'Interview Scheduled - {{date}}', body: 'Hi {{candidate_name}}, Your interview has been scheduled for {{date}} at {{time}}. Best regards, {{recruiter_name}}', variables: ['candidate_name', 'date', 'time', 'recruiter_name'], system: true },
+            { id: 't3', name: 'Rejection Notice', subject: 'Application Status Update', body: 'Hi {{candidate_name}}, Thank you for your interest in the {{position}} role. Unfortunately, we have decided to move forward with other candidates.', variables: ['candidate_name', 'position'], system: true },
+            { id: 't4', name: 'Offer Letter', subject: 'Job Offer - {{position}}', body: 'Hi {{candidate_name}}, We are pleased to offer you the {{position}} role at {{salary}} per annum.', variables: ['candidate_name', 'position', 'salary'], system: false },
+            { id: 't5', name: 'Onboarding Welcome', subject: 'Welcome to the Team!', body: 'Hi {{candidate_name}}, Welcome aboard! Your first day is {{start_date}}.', variables: ['candidate_name', 'start_date'], system: false }
+        ];
+
+        const generateTeamMembers = () => [
+            { id: 'tm1', name: 'Sarah Chen', email: 'sarah@apexdigital.com', role: 'Recruiter', assigned: 18, hired: 6, conversion: '33%' },
+            { id: 'tm2', name: 'Marcus Johnson', email: 'marcus@apexdigital.com', role: 'Hiring Manager', assigned: 24, hired: 9, conversion: '38%' },
+            { id: 'tm3', name: 'Elena Rodriguez', email: 'elena@apexdigital.com', role: 'Recruiter', assigned: 15, hired: 4, conversion: '27%' },
+            { id: 'tm4', name: 'David Park', email: 'david@apexdigital.com', role: 'Admin', assigned: 12, hired: 5, conversion: '42%' },
+            { id: 'tm5', name: 'Jessica Lee', email: 'jessica@apexdigital.com', role: 'Coordinator', assigned: 10, hired: 3, conversion: '30%' },
+            { id: 'tm6', name: 'Zain M', email: 'zain@apexdigital.com', role: 'Admin', assigned: 20, hired: 8, conversion: '40%' }
+        ];
+
+        const generateNovaData = () => [
+            { id: 'ns1', candidateName: 'Alex Thompson', score: 87, status: 'Passed', date: '2026-03-10', questions: [{ q: 'Describe your leadership style', a: 'Collaborative and inclusive', score: 90 }] },
+            { id: 'ns2', candidateName: 'Jamie Lee', score: 62, status: 'Failed', date: '2026-03-09', questions: [{ q: 'Tell us about a challenge', a: 'Handled customer disputes', score: 60 }] },
+            { id: 'ns3', candidateName: 'Morgan Blake', score: 85, status: 'Passed', date: '2026-03-08', questions: [{ q: 'What are your goals?', a: 'Growth and impact', score: 85 }] },
+            { id: 'ns4', candidateName: 'Casey Rodriguez', score: 71, status: 'Pending', date: '2026-03-07', questions: [{ q: 'Experience with agile?', a: 'Yes, 3 years', score: 72 }] },
+            { id: 'ns5', candidateName: 'Taylor Kim', score: 92, status: 'Passed', date: '2026-03-06', questions: [{ q: 'Problem solving approach?', a: 'Data-driven analysis', score: 92 }] },
+            { id: 'ns6', candidateName: 'Jordan Smith', score: 58, status: 'Failed', date: '2026-03-05', questions: [{ q: 'Communication skills?', a: 'Basic level', score: 58 }] }
+        ];
+
+        function Toast({ message, onDismiss }) {
+            useEffect(() => {
+                const timer = setTimeout(onDismiss, 3000);
+                return () => clearTimeout(timer);
+            }, [onDismiss]);
+            return <div className="toast"><p className="text-sm text-gray-800">{message}</p></div>;
+        }
+
+        function Logo() {
+            return (
+                <div className="flex items-center gap-3">
+                    <div className="emerald-gradient w-8 h-8 rounded flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">TF</span>
+                    </div>
+                    <span className="font-semibold text-gray-900">TalentFlow.ai</span>
+                </div>
+            );
+        }
+
+        function Dropdown({ label, items, onSelect }) {
+            const [open, setOpen] = useState(false);
+            const ref = useRef(null);
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+                };
+                if (open) {
+                    document.addEventListener('mousedown', handleClickOutside);
+                    return () => document.removeEventListener('mousedown', handleClickOutside);
+                }
+            }, [open]);
+            return (
+                <div className="relative" ref={ref}>
+                    <button onClick={() => setOpen(!open)} className="text-gray-700 hover:text-emerald-600 text-sm font-medium flex items-center gap-1">
+                        {label}
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    </button>
+                    {open && (
+                        <div className="nav-dropdown">
+                            {items.map(item => (
+                                <button key={item.id} onClick={() => { onSelect(item); setOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 first:rounded-t last:rounded-b">
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function Navbar({ currentPage, onNavigate }) {
+            const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+            const userRef = useRef(null);
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (userRef.current && !userRef.current.contains(event.target)) setUserDropdownOpen(false);
+                };
+                if (userDropdownOpen) {
+                    document.addEventListener('mousedown', handleClickOutside);
+                    return () => document.removeEventListener('mousedown', handleClickOutside);
+                }
+            }, [userDropdownOpen]);
+            return (
+                <nav className="sticky top-0 z-40 bg-white border-b border-gray-200 h-14 flex items-center px-6 gap-8">
+                    <Logo />
+                    <div className="flex gap-6 flex-1">
+                        <button onClick={() => onNavigate('dashboard')} className={'text-sm font-medium ' + (currentPage === 'dashboard' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Dashboard</button>
+                        <button onClick={() => onNavigate('pipelines')} className={'text-sm font-medium ' + (currentPage === 'pipelines' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Pipelines</button>
+                        <Dropdown label="Candidates" items={[{ id: 'overview', label: 'Overview' }, { id: 'duplicates', label: 'Duplicates' }]} onSelect={item => onNavigate('candidates-' + item.id)} />
+                        <button onClick={() => onNavigate('templates')} className={'text-sm font-medium ' + (currentPage === 'templates' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Templates</button>
+                        <button onClick={() => onNavigate('nova')} className={'text-sm font-medium ' + (currentPage === 'nova' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600')}>Nova</button>
+                        <Dropdown label="Organisation" items={[
+                            { id: 'members', label: 'Members & Permissions' },
+                            { id: 'branding', label: 'Branding' },
+                            { id: 'company', label: 'Company Details' },
+                            { id: 'email', label: 'Email Domain' },
+                            { id: 'applications', label: 'Applications' },
+                            { id: 'calendar', label: 'Calendar' },
+                            { id: 'billing', label: 'Billing' },
+                            { id: 'statistics', label: 'Statistics' },
+                            { id: 'leaderboard', label: 'Leaderboard' }
+                        ]} onSelect={item => onNavigate('org-' + item.id)} />
+                    </div>
+                    <div className="flex items-center gap-4 ml-auto">
+                        <span className="text-sm font-medium text-gray-700">Apex Digital</span>
+                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded">ENTERPRISE</span>
+                        <button className="relative">
+                            <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">2</span>
+                        </button>
+                        <button className="text-gray-700"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg></button>
+                        <div className="relative" ref={userRef}>
+                            <button onClick={() => setUserDropdownOpen(!userDropdownOpen)} className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-bold">ZM</button>
+                            {userDropdownOpen && (
+                                <div className="nav-dropdown right-0 left-auto">
+                                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Profile</button>
+                                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-b">Logout</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </nav>
+            );
+        }
+
+        function DashboardPage() {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            useEffect(() => {
+                if (chartRef.current && typeof Chart !== 'undefined') {
+                    const ctx = chartRef.current.getContext('2d');
+                    if (chartInstance.current) chartInstance.current.destroy();
+                    chartInstance.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Mar 1', 'Mar 5', 'Mar 10', 'Mar 15', 'Mar 20', 'Mar 25', 'Mar 30'],
+                            datasets: [{ label: 'Candidates', data: [42, 48, 55, 62, 78, 95, 120], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.4, fill: true }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 130 } } }
+                    });
+                }
+                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+            }, []);
+            return (
+                <div className="p-6 space-y-6">
+                    <div className="emerald-gradient rounded-lg p-6 text-white"><p className="text-sm opacity-90">Total Candidates</p><p className="text-4xl font-bold mt-2">120</p></div>
+                    <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Candidates Over Time</h3><canvas ref={chartRef}></canvas></div>
+                    <div className="grid grid-cols-3 gap-6">
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3><div className="space-y-3 text-sm"><div className="text-gray-700">Emma Davis moved to Interview</div><div className="text-gray-700">Liam Chen added to Screening</div></div></div>
+                        <div className="bg-green-50 rounded-lg p-6 border border-green-200"><p className="text-sm text-gray-600">Hired This Month</p><p className="text-3xl font-bold text-green-600 mt-2">8</p></div>
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Email Analytics</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span>Sent:</span><span className="font-medium">245</span></div></div></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-6">
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Screening Stats</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span>Passed:</span><span className="text-green-600 font-medium">34</span></div><div className="flex justify-between"><span>Failed:</span><span className="text-red-600 font-medium">8</span></div></div></div>
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Pipeline Breakdown</h3><div className="space-y-2 text-xs"><div><div className="flex justify-between mb-1"><span>Frontend</span><span>20</span></div><div className="w-full bg-gray-200 h-2 rounded"><div className="bg-blue-500 h-2 rounded" style={{width:'33%'}}></div></div></div></div></div>
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><h3 className="font-semibold text-gray-900 mb-4">Sources Breakdown</h3><div className="space-y-2 text-xs"><div><div className="flex justify-between mb-1"><span>LinkedIn</span><span>45</span></div><div className="w-full bg-gray-200 h-2 rounded"><div className="bg-emerald-500 h-2 rounded" style={{width:'38%'}}></div></div></div></div></div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PipelinesPage({ onNavigate }) {
+            const pipelines = [
+                { name: 'Senior Frontend Dev', count: 20 },
+                { name: 'Product Manager', count: 18 },
+                { name: 'UX Designer', count: 16 },
+                { name: 'Data Analyst', count: 19 },
+                { name: 'DevOps Engineer', count: 17 },
+                { name: 'Marketing Lead', count: 14 }
+            ];
+            return (
+                <div className="p-6">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Pipelines</h1>
+                    <div className="grid grid-cols-3 gap-6">
+                        {pipelines.map(pipeline => (
+                            <div key={pipeline.name} className="bg-white rounded-lg p-6 border border-gray-200 hover:shadow-lg transition">
+                                <h3 className="font-semibold text-gray-900 mb-2">{pipeline.name}</h3>
+                                <p className="text-3xl font-bold text-emerald-600 mb-4">{pipeline.count}</p>
+                                <button onClick={() => onNavigate('pipeline-detail', pipeline.name)} className="w-full bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700 text-sm font-medium">View Pipeline</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function PipelineDetailPage({ pipelineName, candidates, setCandidates, templates, onBack }) {
+            const [viewMode, setViewMode] = useState('kanban');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [showAddModal, setShowAddModal] = useState(false);
+            const [selectedCandidate, setSelectedCandidate] = useState(null);
+            const [formData, setFormData] = useState({ name: '', email: '', phone: '', stage: 'Applied' });
+            const pipelineCandidates = candidates.filter(c => c.pipeline === pipelineName);
+            const filtered = pipelineCandidates.filter(c => c.name.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1 || c.email.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1);
+            const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
+            const handleAddCandidate = () => {
+                if (formData.name && formData.email) {
+                    setCandidates(candidates.concat([{
+                        id: 'c' + Date.now(),
+                        name: formData.name,
+                        email: formData.email,
+                        phone: formData.phone,
+                        pipeline: pipelineName,
+                        stage: formData.stage,
+                        score: 70,
+                        source: 'Manual',
+                        notes: '',
+                        emails: []
+                    }]));
+                    setFormData({ name: '', email: '', phone: '', stage: 'Applied' });
+                    setShowAddModal(false);
+                }
+            };
+            return (
+                <div className="p-6">
+                    <button onClick={onBack} className="text-emerald-600 font-medium mb-4">â Back</button>
+                    <div className="flex justify-between items-center mb-6">
+                        <div><h1 className="text-2xl font-bold text-gray-900">{pipelineName}</h1><p className="text-gray-600">{filtered.length} candidates</p></div>
+                        <button onClick={() => setShowAddModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 font-medium">Add Candidate</button>
+                    </div>
+                    <div className="flex gap-4 mb-6">
+                        <input type="text" placeholder="Search by name or email..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        <button onClick={() => setViewMode('kanban')} className={'px-4 py-2 rounded font-medium ' + (viewMode === 'kanban' ? 'bg-emerald-600 text-white' : 'bg-gray-200')}>Kanban</button>
+                        <button onClick={() => setViewMode('table')} className={'px-4 py-2 rounded font-medium ' + (viewMode === 'table' ? 'bg-emerald-600 text-white' : 'bg-gray-200')}>Table</button>
+                    </div>
+                    {viewMode === 'kanban' && (
+                        <div className="flex gap-4 overflow-x-auto pb-4">
+                            {stages.map(stage => (
+                                <div key={stage} className="kanban-column bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h3 className="font-semibold text-gray-900 mb-4">{stage}</h3>
+                                    <div className="space-y-3">
+                                        {filtered.filter(c => c.stage === stage).map(candidate => (
+                                            <div key={candidate.id} onClick={() => setSelectedCandidate(candidate)} className="bg-white p-3 rounded border border-gray-200 cursor-pointer hover:shadow-md">
+                                                <p className="font-medium text-gray-900 text-sm">{candidate.name}</p>
+                                                <p className="text-xs text-gray-500 mt-1">{candidate.email}</p>
+                                                <p className="text-xs font-semibold text-emerald-600 mt-2">Score: {candidate.score}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {viewMode === 'table' && (
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Stage</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Score</th>
+                                </tr></thead>
+                                <tbody>
+                                    {filtered.map(candidate => (
+                                        <tr key={candidate.id} onClick={() => setSelectedCandidate(candidate)} className="border-b hover:bg-gray-50 cursor-pointer">
+                                            <td className="px-6 py-4 text-sm">{candidate.name}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{candidate.email}</td>
+                                            <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">{candidate.stage}</span></td>
+                                            <td className="px-6 py-4 text-sm font-medium text-emerald-600">{candidate.score}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {showAddModal && (
+                        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-bold text-gray-900 mb-4">Add Candidate</h2>
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                                    <input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                                    <input type="tel" placeholder="Phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+                                    <select value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                        {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+                                    <button onClick={handleAddCandidate} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {selectedCandidate && (
+                        <CandidateModal candidate={selectedCandidate} setCandidate={updated => setCandidates(candidates.map(c => c.id === selectedCandidate.id ? updated : c))} templates={templates} onClose={() => setSelectedCandidate(null)} />
+                    )}
+                </div>
+            );
+        }
+
+        function CandidateModal({ candidate, setCandidate, templates, onClose }) {
+            const [activeTab, setActiveTab] = useState('overview');
+            const [notes, setNotes] = useState(candidate.notes);
+            const [newStage, setNewStage] = useState(candidate.stage);
+            const [showEmailModal, setShowEmailModal] = useState(false);
+            const [emailSubject, setEmailSubject] = useState('');
+            const [emailBody, setEmailBody] = useState('');
+            const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+            const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
+            const handleSaveNotes = () => {
+                setCandidate({...candidate, notes: notes});
+            };
+            const handleMoveStage = () => {
+                setCandidate({...candidate, stage: newStage});
+            };
+            const handleSendEmail = () => {
+                setCandidate({...candidate, emails: candidate.emails.concat([{id: 'e' + Date.now(), subject: emailSubject, body: emailBody, date: new Date().toLocaleDateString()}])});
+                setShowEmailModal(false);
+                setEmailSubject('');
+                setEmailBody('');
+            };
+            const handleReject = () => {
+                setCandidate({...candidate, stage: 'Rejected'});
+                setShowRejectConfirm(false);
+                onClose();
+            };
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-start mb-6">
+                            <div><h2 className="text-2xl font-bold text-gray-900">{candidate.name}</h2><p className="text-gray-600 text-sm mt-1">{candidate.email}</p></div>
+                            <button onClick={onClose} className="text-gray-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        <div className="flex gap-4 border-b border-gray-200 mb-6">
+                            <button onClick={() => setActiveTab('overview')} className={'pb-3 font-medium ' + (activeTab === 'overview' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-gray-700')}>Overview</button>
+                            <button onClick={() => setActiveTab('notes')} className={'pb-3 font-medium ' + (activeTab === 'notes' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-gray-700')}>Notes</button>
+                            <button onClick={() => setActiveTab('emails')} className={'pb-3 font-medium ' + (activeTab === 'emails' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-gray-700')}>Emails</button>
+                        </div>
+                        {activeTab === 'overview' && (
+                            <div className="space-y-4">
+                                <select value={newStage} onChange={e => setNewStage(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                    {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <button onClick={handleMoveStage} className="w-full px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Update Stage</button>
+                                <button onClick={() => setShowEmailModal(true)} className="w-full px-4 py-2 border border-emerald-600 text-emerald-600 rounded hover:bg-emerald-50">Send Email</button>
+                            </div>
+                        )}
+                        {activeTab === 'notes' && (
+                            <div className="space-y-4">
+                                <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none h-32" />
+                                <button onClick={handleSaveNotes} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Save Notes</button>
+                            </div>
+                        )}
+                        {activeTab === 'emails' && (
+                            <div className="space-y-3">
+                                {candidate.emails.length === 0 && <p className="text-gray-500">No emails sent yet</p>}
+                                {candidate.emails.map(email => (
+                                    <div key={email.id} className="bg-gray-50 p-4 rounded">
+                                        <p className="font-medium text-gray-900">{email.subject}</p>
+                                        <p className="text-sm text-gray-600 mt-2">{email.body}</p>
+                                        <p className="text-xs text-gray-500 mt-2">{email.date}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-200">
+                            <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">Close</button>
+                            <button onClick={() => setShowRejectConfirm(true)} className="px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50">Reject</button>
+                        </div>
+                        {showEmailModal && (
+                            <div className="modal-overlay" onClick={() => setShowEmailModal(false)}>
+                                <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">Send Email</h3>
+                                    <input type="text" placeholder="Subject" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-4" />
+                                    <textarea placeholder="Body" value={emailBody} onChange={e => setEmailBody(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none h-24 mb-4" />
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setShowEmailModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
+                                        <button onClick={handleSendEmail} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded">Send</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {showRejectConfirm && (
+                            <div className="modal-overlay" onClick={() => setShowRejectConfirm(false)}>
+                                <div className="modal-content w-80 p-6" onClick={e => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-gray-900 mb-2">Reject Candidate</h3>
+                                    <p className="text-gray-600 mb-6">Are you sure?</p>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setShowRejectConfirm(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
+                                        <button onClick={handleReject} className="flex-1 px-4 py-2 bg-red-600 text-white rounded">Reject</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function CandidatesOverviewPage({ candidates, setCandidates, templates }) {
+            const [searchQuery, setSearchQuery] = useState('');
+            const [selectedCandidate, setSelectedCandidate] = useState(null);
+            const filtered = candidates.filter(c => c.name.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1 || c.email.toLowerCase().indexOf(searchQuery.toLowerCase()) > -1);
+            return (
+                <div className="p-6">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Candidates</h1>
+                    <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-6" />
+                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Pipeline</th>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Stage</th>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Score</th>
+                            </tr></thead>
+                            <tbody>
+                                {filtered.map(candidate => (
+                                    <tr key={candidate.id} onClick={() => setSelectedCandidate(candidate)} className="border-b hover:bg-gray-50 cursor-pointer">
+                                        <td className="px-6 py-4 text-sm">{candidate.name}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-600">{candidate.email}</td>
+                                        <td className="px-6 py-4 text-sm">{candidate.pipeline}</td>
+                                        <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">{candidate.stage}</span></td>
+                                        <td className="px-6 py-4 text-sm font-medium text-emerald-600">{candidate.score}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {selectedCandidate && (
+                        <CandidateModal candidate={selectedCandidate} setCandidate={updated => setCandidates(candidates.map(c => c.id === selectedCandidate.id ? updated : c))} templates={templates} onClose={() => setSelectedCandidate(null)} />
+                    )}
+                </div>
+            );
+        }
+
+        function DuplicatesPage() {
+            const [toastMessage, setToastMessage] = useState('');
+            const duplicateGroups = [
+                { id: 'd1', candidates: ['John Smith', 'Jon Smith'], similarity: 95 },
+                { id: 'd2', candidates: ['Sarah Johnson', 'Sara Johnson'], similarity: 92 }
+            ];
+            return (
+                <div className="p-6">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Duplicate Candidates</h1>
+                    {duplicateGroups.map(group => (
+                        <div key={group.id} className="bg-white rounded-lg p-6 border border-gray-200 flex justify-between items-center mb-4">
+                            <div><p className="font-semibold text-gray-900">{group.candidates[0]} vs {group.candidates[1]}</p><p className="text-sm text-gray-600">Similarity: {group.similarity}%</p></div>
+                            <button onClick={() => setToastMessage('Merged')} className="px-4 py-2 bg-emerald-600 text-white rounded">Merge</button>
+                        </div>
+                    ))}
+                    {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
+                </div>
+            );
+        }
+
+        function TemplatesPage({ templates, setTemplates }) {
+            const [toastMessage, setToastMessage] = useState('');
+            const [showCreateModal, setShowCreateModal] = useState(false);
+            const [formData, setFormData] = useState({ name: '', subject: '', body: '' });
+            const handleCreateTemplate = () => {
+                if (formData.name && formData.subject && formData.body) {
+                    setTemplates(templates.concat([{
+                        id: 't' + Date.now(),
+                        name: formData.name,
+                        subject: formData.subject,
+                        body: formData.body,
+                        variables: [],
+                        system: false
+                    }]));
+                    setFormData({ name: '', subject: '', body: '' });
+                    setShowCreateModal(false);
+                    setToastMessage('Template created');
+                }
+            };
+            const handleDeleteTemplate = (id) => {
+                setTemplates(templates.filter(t => t.id !== id));
+                setToastMessage('Deleted');
+            };
+            return (
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Templates</h1>
+                        <button onClick={() => setShowCreateModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded">New</button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-6">
+                        {templates.map(t => (
+                            <div key={t.id} className="bg-white rounded-lg p-6 border border-gray-200">
+                                <div className="flex justify-between items-start mb-3">
+                                    <h3 className="font-semibold text-gray-900">{t.name}</h3>
+                                    {!t.system && <button onClick={() => handleDeleteTemplate(t.id)} className="text-red-600 text-sm">Delete</button>}
+                                </div>
+                                <p className="text-sm text-gray-600 mb-3">{t.subject}</p>
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">{t.system === true ? 'System' : 'Custom'}</span>
+                            </div>
+                        ))}
+                    </div>
+                    {showCreateModal && (
+                        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+                            <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-xl font-bold text-gray-900 mb-4">Create Template</h2>
+                                <input type="text" placeholder="Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded mb-4" />
+                                <input type="text" placeholder="Subject" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded mb-4" />
+                                <textarea placeholder="Body" value={formData.body} onChange={e => setFormData({...formData, body: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded mb-4 h-24" />
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
+                                    <button onClick={handleCreateTemplate} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded">Create</button>
+                                </div>
+  2                         </div>
+                        </div>
+                    )}
+                    {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
+                </div>
+            );
+        }
+
+        function NovaPage() {
+            const [selectedSession, setSelectedSession] = useState(null);
+            const novaSessions = generateNovaData();
+            return (
+                <div className="p-6">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova AI Screening</h1>
+                    <div className="grid grid-cols-4 gap-6 mb-6">
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Enabled Pipelines</p><p className="text-3xl font-bold text-emerald-600">6</p></div>
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Total Sessions</p><p className="text-3xl font-bold text-emerald-600">6</p></div>
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Completed</p><p className="text-3xl font-bold text-emerald-600">5</p></div>
+                        <div className="bg-white rounded-lg p-6 border border-gray-200"><p className="text-sm text-gray-600">Pass Rate</p><p className="text-3xl font-bold text-emerald-600">60%</p></div>
+                    </div>
+                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Candidate</th>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Score</th>
+                                <th className="px-6 py-3 text-left text-sm font-semibold">Status</th>
+                            </tr></thead>
+                            <tbody>
+                                {novaSessions.map(s => (
+                                    <tr key={s.id} onClick={() => setSelectedSession(s)} className="border-b hover:bg-gray-50 cursor-pointer">
+                                        <td className="px-6 py-4 text-sm">{s.candidateName}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-emerald-600">{s.score}</td>
+                                        <td className="px-6 py-4 text-sm"><span className={'px-2 py-1 text-xs rounded ' + (s.status === 'Passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>{s.status}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {selectedSession && (
+                        <div className="modal-overlay" onClick={() => setSelectedSession(null)}>
+                            <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
+                                <h2 className="text-2xl font-bold text-gray-900">{selectedSession.candidateName}</h2>
+                                <p className="text-gray-600 mt-2">Score: {selectedSession.score} | Status: {selectedSession.status}</p>
+                                <h3 className="font-semibold text-gray-900 mt-6 mb-4">Q&A Review</h3>
+                                {selectedSession.questions.map((q, i) => (
+                                    <div key={i} className="bg-gray-50 p-4 rounded mb-4">
+                                        <p className="font-medium text-gray-900">Q: {q.q}</p>
+                                        <p className="text-gray-700 mt-2">A: {q.a}</p>
+                                        <p className="text-xs text-gray-500 mt-2">Score: {q.score}</p>
+                                    </div>
+                                ))}
+                                <button onClick={() => setSelectedSession(null)} className="w-full px-4 py-2 bg-emerald-600 text-white rounded mt-6">Close</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function OrganisationPage({ tab, teamMembers, setTeamMembers }) {
+            const [toastMessage, setToastMessage] = useState('');
+            const [showInviteModal, setShowInviteModal] = useState(false);
+            const [inviteEmail, setInviteEmail] = useState('');
+            const handleInviteMember = () => {
+                if (inviteEmail) {
+                    setTeamMembers(teamMembers.concat([{
+                        id: 'tm' + Date.now(),
+                        name: inviteEmail.split('@')[0],
+                        email: inviteEmail,
+                        role: 'Recruiter',
+                        assigned: 0,
+                        hired: 0,
+                        conversion: '0%'
+                    }]));
+                    setInviteEmail('');
+                    setShowInviteModal(false);
+                    setToastMessage('Invited');
+                }
+            };
+            const handleRemoveMember = (id) => {
+                setTeamMembers(teamMembers.filter(m => m.id !== id));
+                setToastMessage('Removed');
+            };
+            if (tab === 'members') {
+                return (
+                    <div className="p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h1 className="text-2xl font-bold text-gray-900">Members</h1>
+                            <button onClick={() => setShowInviteModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded">Invite</button>
+                        </div>
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Role</th>
+                                    <th className="px-6 py-3 text-right text-sm font-semibold">Action</th>
+                                </tr></thead>
+                                <tbody>
+                                    {teamMembers.map(m => (
+                                        <tr key={m.id} className="border-b hover:bg-gray-50">
+                                            <td className="px-6 py-4 text-sm">{m.name}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{m.email}</td>
+                                            <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">{m.role}</span></td>
+                                            <td className="px-6 py-4 text-right"><button onClick={() => handleRemoveMember(m.id)} className="text-red-600 text-sm">Remove</button></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {showInviteModal && (
+                            <div className="modal-overlay" onClick={() => setShowInviteModal(false)}>
+                                <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
+                                    <h2 className="text-xl font-bold text-gray-900 mb-4">Invite Member</h2>
+                                    <input type="email" placeholder="Email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded mb-4" />
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setShowInviteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded">Cancel</button>
+                                        <button onClick={handleInviteMember} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded">Invite</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />}
+                    </div>
+                );
+            }
+            if (tab === 'leaderboard') {
+                return (
+                    <div className="p-6">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-6">Leaderboard</h1>
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Rank</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Hired</th>
+                                    <th className="px-6 py-3 text-left text-sm font-semibold">Conversion</th>
+                                </tr></thead>
+                                <tbody>
+                                    {teamMembers.map((m, i) => (
+                                        <tr key={m.id} className="border-b hover:bg-gray-50">
+                                            <td className="px-6 py-4 text-sm font-bold">{i + 1}</td>
+                                            <td className="px-6 py-4 text-sm">{m.name}</td>
+                                            <td className="px-6 py-4 text-sm font-medium text-emerald-600">{m.hired}</td>
+                                            <td className="px-6 py-4 text-sm">{m.conversion}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+            }
+            return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">{tab}</h1></div>;
+        }
+
+        function App() {
+            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [pageParams, setPageParams] = useState({});
+            const [candidates, setCandidates] = useState(generateCandidates());
+            const [templates, setTemplates] = useState(generateTemplates());
+            const [teamMembers, setTeamMembers] = useState(generateTeamMembers());
+
+            const handleNavigate = (page, params) => {
+                setCurrentPage(page);
+                setPageParams(params || {});
+            };
+
+            const renderPage = () => {
+                if (currentPage === 'dashboard') return <DashboardPage />;
+                if (currentPage === 'pipelines') return <PipelinesPage onNavigate={handleNavigate} />;
+                if (currentPage.indexOf('pipeline-detail') === 0) return <PipelineDetailPage pipelineName={pageParams} candidates={candidates} setCandidates={setCandidates} templates={templates} onBack={() => handleNavigate('pipelines')} />;
+                if (currentPage === 'candidates-overview') return <CandidatesOverviewPage candidates={candidates} setCandidates={setCandidates} templates={templates} />;
+                if (currentPage === 'candidates-duplicates') return <DuplicatesPage />;
+                if (currentPage === 'templates') return <TemplatesPage templates={templates} setTemplates={setTemplates} />;
+                if (currentPage === 'nova') return <NovaPage />;
+                if (currentPage.indexOf('org-') === 0) return <OrganisationPage tab={currentPage.replace('org-', '')} teamMembers={teamMembers} setTeamMembers={setTeamMembers} />;
+                return <DashboardPage />;
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
+                    {renderPage()}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
