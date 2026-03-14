@@ -94,22 +94,38 @@
             const [password, setPassword] = useState('');
             const [name, setName] = useState('');
             const [company, setCompany] = useState('');
+            const [inviteCode, setInviteCode] = useState('');
             const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
             const [success, setSuccess] = useState('');
+            const [isFirst, setIsFirst] = useState(null); // null=checking, true=owner slot, false=needs code
+
+            useEffect(() => {
+                if (mode === 'signup') {
+                    setIsFirst(null);
+                    sb.rpc('is_first_user').then(({ data }) => setIsFirst(!!data));
+                }
+            }, [mode]);
 
             const handleSignup = async () => {
                 if (!name || !company || !email || !password) { setError('All fields are required.'); return; }
+                if (!isFirst && !inviteCode.trim()) { setError('An invite code is required to sign up.'); return; }
                 setLoading(true); setError('');
                 try {
+                    if (!isFirst) {
+                        const { data: valid } = await sb.rpc('validate_invite', { p_code: inviteCode.trim().toUpperCase() });
+                        if (!valid) { setError('Invalid or already used invite code. Contact the workspace owner.'); setLoading(false); return; }
+                    }
                     const { data: { user }, error: authErr } = await sb.auth.signUp({ email, password });
                     if (authErr) throw authErr;
                     if (!user) { setSuccess('Check your email to confirm your account, then sign in.'); setLoading(false); return; }
                     const { data: org, error: orgErr } = await sb.from('organizations').insert({ name: company }).select().single();
                     if (orgErr) throw orgErr;
-                    const { error: profErr } = await sb.from('profiles').insert({ id: user.id, org_id: org.id, name, email, role: 'Admin' });
+                    const assignedRole = isFirst ? 'Owner' : 'Admin';
+                    const { error: profErr } = await sb.from('profiles').insert({ id: user.id, org_id: org.id, name, email, role: assignedRole, status: 'active' });
                     if (profErr) throw profErr;
-                    setSuccess('Account created! Signing you in...');
+                    if (!isFirst) { await sb.rpc('use_invite', { p_code: inviteCode.trim().toUpperCase(), p_user_id: user.id }); }
+                    setSuccess(isFirst ? 'Owner account created! Signing you in...' : 'Account created! Signing you in...');
                 } catch(e) { setError(e.message || 'Something went wrong.'); }
                 setLoading(false);
             };
@@ -132,32 +148,46 @@
                             {mode === 'login' ? 'Welcome back' : 'Create your workspace'}
                         </h2>
                         <p className="text-sm text-gray-500 mb-6">
-                            {mode === 'login' ? 'Sign in to your TalentFlow account' : 'Start hiring smarter today'}
+                            {mode === 'login' ? 'Sign in to your TalentFlow account' : 'Invite-only access'}
                         </p>
                         {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mb-4">{error}</div>}
                         {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-lg mb-4">{success}</div>}
-                        {mode === 'signup' && (
+                        {mode === 'signup' && isFirst === null && (
+                            <div className="flex justify-center py-4"><Spinner size={5} /></div>
+                        )}
+                        {mode === 'signup' && isFirst !== null && (
                             <>
+                                {isFirst && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-2 rounded-lg mb-4 text-center font-medium">Setting up as Owner account</div>}
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Your name</label>
                                 <input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Company name</label>
                                 <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corp" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                {!isFirst && (
+                                    <>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Invite Code</label>
+                                        <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder="XXXXXX-XXXX" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    </>
+                                )}
                             </>
                         )}
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleSignup())} />
-                        <button onClick={mode === 'login' ? handleLogin : handleSignup} disabled={loading}
-                            className="w-full py-2.5 emerald-gradient text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
-                            {loading ? <Spinner size={4} /> : null}
-                            {loading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create workspace'}
-                        </button>
+                        {(mode === 'login' || isFirst !== null) && (
+                            <>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleSignup())} />
+                                <button onClick={mode === 'login' ? handleLogin : handleSignup} disabled={loading}
+                                    className="w-full py-2.5 emerald-gradient text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                                    {loading ? <Spinner size={4} /> : null}
+                                    {loading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create workspace'}
+                                </button>
+                            </>
+                        )}
                         <p className="text-sm text-gray-500 text-center mt-4">
-                            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-                            <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccess(''); }} className="text-emerald-600 font-medium">
-                                {mode === 'login' ? 'Sign up free' : 'Sign in'}
+                            {mode === 'login' ? "Have an invite code? " : 'Already have an account? '}
+                            <button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setSuccess(''); setIsFirst(null); }} className="text-emerald-600 font-medium">
+                                {mode === 'login' ? 'Sign up' : 'Sign in'}
                             </button>
                         </p>
                     </div>
@@ -188,6 +218,9 @@
                             <button onClick={() => onNavigate('templates')} className={`text-sm font-medium ${currentPage === 'templates' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Templates</button>
                             <button onClick={() => onNavigate('nova')} className={`text-sm font-medium ${currentPage === 'nova' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Nova</button>
                             <Dropdown label="Organisation" items={[{id:'members',label:'Members'},{id:'leaderboard',label:'Leaderboard'}]} onSelect={i => onNavigate('org-' + i.id)} />
+                            {profile?.role === 'Owner' && (
+                                <button onClick={() => onNavigate('admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:text-red-600 hover:bg-red-50'}`}>â Admin</button>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -630,7 +663,7 @@
                                         <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">{c.name.charAt(0)}</div><div><p className="text-sm font-medium text-gray-900">{c.name}</p><p className="text-xs text-gray-500">{c.email}</p></div></div></td>
                                         <td className="px-4 py-3 text-sm text-gray-600">{c.pipeline_name || 'â'}</td>
                                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${c.stage==='Hired'?'bg-emerald-100 text-emerald-700':c.stage==='Rejected'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-700'}`}>{c.stage}</span></td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">{c.source||'<Zò¢Ã·'}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{c.source||'â'}</td>
                                         <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-16 bg-gray-100 rounded-full h-1.5"><div className="bg-emerald-500 h-1.5 rounded-full" style={{width:(c.score||0)+'%'}}/></div><span className="text-xs text-gray-600">{c.score||0}</span></div></td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
                                     </tr>
@@ -792,7 +825,7 @@
                                 <p className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded mb-4">{selected.subject}</p>
                                 <p className="text-sm font-medium text-gray-700 mb-1">Body</p>
                                 <pre className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded whitespace-pre-wrap mb-4 font-sans">{selected.body}</pre>
-                                x(selected.variables||[]).length > 0 && <div className="flex flex-wrap gap-1 mb-4">{selected.variables.map(v => <span key={v} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">{'{{'+v+'}}'}</span>)}</div>}
+                                {(selected.variables||[]).length > 0 && <div className="flex flex-wrap gap-1 mb-4">{selected.variables.map(v => <span key={v} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">{'{{'+v+'}}'}</span>)}</div>}
                                 {!selected.is_system && (
                                     <div className="flex gap-3">
                                         <button onClick={() => { setForm({ name:selected.name, subject:selected.subject, body:selected.body, variables:(selected.variables||[]).join(', ') }); setEditing(selected.id); setSelected(null); setShowAdd(false); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Edit</button>
@@ -988,6 +1021,127 @@
             return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">{tab}</h1></div>;
         }
 
+        // ââ ADMIN PAGE (Owner only) ââââââââââââââââââââââââââââââââââââââââââ
+        function AdminPage() {
+            const { profile, toast } = useContext(AppCtx);
+            const [tab, setTab] = useState('codes');
+            const [codes, setCodes] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [newNote, setNewNote] = useState('');
+            const [saving, setSaving] = useState(false);
+
+            if (profile?.role !== 'Owner') return (
+                <div className="p-12 text-center text-gray-500 text-sm">Access denied â Owner role required.</div>
+            );
+
+            const load = useCallback(async () => {
+                setLoading(true);
+                const [{ data: c }, { data: u }] = await Promise.all([
+                    sb.from('invite_codes').select('*').order('created_at', { ascending: false }),
+                    sb.from('profiles').select('id,name,email,role,status,org_id,created_at').order('created_at')
+                ]);
+                setCodes(c || []); setUsers(u || []); setLoading(false);
+            }, []);
+
+            useEffect(() => { load(); }, [load]);
+
+            const generateCode = async () => {
+                setSaving(true);
+                const part1 = Math.random().toString(36).slice(2, 8).toUpperCase();
+                const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
+                const code = part1 + '-' + part2;
+                const { error } = await sb.from('invite_codes').insert({ code, note: newNote || null });
+                if (error) { toast(error.message, 'error'); } else { toast('Code generated: ' + code); setNewNote(''); await load(); }
+                setSaving(false);
+            };
+
+            const deleteCode = async (id) => {
+                await sb.from('invite_codes').delete().eq('id', id);
+                toast('Code deleted'); await load();
+            };
+
+            const setUserStatus = async (id, status) => {
+                const { error } = await sb.from('profiles').update({ status }).eq('id', id);
+                if (error) { toast(error.message, 'error'); } else { toast('User ' + status); await load(); }
+            };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
+            return (
+                <div className="p-6 max-w-6xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Owner Admin Panel</h1>
+                        <span className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded-full font-semibold">Owner Only</span>
+                    </div>
+                    <div className="flex gap-2 mb-6">
+                        {[{id:'codes',label:'Invite Codes'},{id:'users',label:'User Accounts'}].map(t => (
+                            <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.id ? 'emerald-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{t.label}</button>
+                        ))}
+                    </div>
+
+                    {tab === 'codes' && (
+                        <div>
+                            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5 shadow-sm">
+                                <h2 className="text-sm font-semibold text-gray-900 mb-1">Generate Invite Code</h2>
+                                <p className="text-xs text-gray-500 mb-3">Each code allows one person to sign up. Share the code directly with them.</p>
+                                <div className="flex gap-3">
+                                    <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Optional note â e.g. 'Acme Corp trial'" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    <button onClick={generateCode} disabled={saving} className="emerald-gradient text-white px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null}Generate</button>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50 border-b"><tr>{['Code','Note','Created','Status','Used By',''].map((h,i) => <th key={i} className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {codes.map(c => (
+                                            <tr key={c.id} className="hover:bg-gray-50">
+                                                <td className="px-5 py-4"><code className="text-sm font-mono bg-emerald-50 text-emerald-700 px-2 py-1 rounded tracking-wider">{c.code}</code></td>
+                                                <td className="px-5 py-4 text-sm text-gray-500">{c.note || <span className="text-gray-300">â</span>}</td>
+                                                <td className="px-5 py-4 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
+                                                <td className="px-5 py-4"><span className={`text-xs px-2 py-1 rounded font-medium ${c.uses_count >= c.max_uses ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'}`}>{c.uses_count >= c.max_uses ? 'Used' : 'Available'}</span></td>
+                                                <td className="px-5 py-4 text-xs text-gray-400">{c.used_by ? (users.find(u => u.id === c.used_by)?.email || c.used_by.slice(0,8)+'â¦') : <span className="text-gray-300">â</span>}</td>
+                                                <td className="px-5 py-4"><button onClick={() => deleteCode(c.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button></td>
+                                            </tr>
+                                        ))}
+                                        {codes.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No invite codes yet â generate one above</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 'users' && (
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>{['Name','Email','Role','Status','Joined','Action'].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {users.map(u => (
+                                        <tr key={u.id} className="hover:bg-gray-50">
+                                            <td className="px-5 py-4 text-sm font-medium text-gray-900">{u.name}</td>
+                                            <td className="px-5 py-4 text-sm text-gray-500">{u.email}</td>
+                                            <td className="px-5 py-4"><span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span></td>
+                                            <td className="px-5 py-4"><span className={`text-xs px-2 py-1 rounded font-medium ${(u.status||'active') === 'active' ? 'bg-emerald-100 text-emerald-700' : (u.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')}`}>{u.status || 'active'}</span></td>
+                                            <td className="px-5 py-4 text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                                            <td className="px-5 py-4">
+                                                {u.role !== 'Owner' && (
+                                                    <div className="flex gap-3">
+                                                        {(u.status || 'active') !== 'suspended' && <button onClick={() => setUserStatus(u.id, 'suspended')} className="text-xs text-red-500 hover:text-red-700 font-medium">Suspend</button>}
+                                                        {(u.status || 'active') === 'suspended' && <button onClick={() => setUserStatus(u.id, 'active')} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Reactivate</button>}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {users.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No users yet</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         // ââ APP ROOT âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
         function App() {
             const [user, setUser] = useState(null);
@@ -1042,6 +1196,7 @@
                 if (currentPage === 'templates') return <TemplatesPage />;
                 if (currentPage === 'nova') return <NovaPage />;
                 if (currentPage.startsWith('org-')) return <OrganisationPage tab={currentPage.replace('org-','')} />;
+                if (currentPage === 'admin') return <AdminPage />;
                 return <DashboardPage />;
             };
 
@@ -1050,7 +1205,7 @@
                     <div className="min-h-screen bg-gray-50">
                         <Navbar currentPage={currentPage} onNavigate={navigate} />
                         {!orgId && (
-                            <div className="bg-yellow-50 border-b border-zellow-200 px-6 py-2 text-sm text-yellow-800 text-center">
+                            <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 text-sm text-yellow-800 text-center">
                                 Setting up your workspace... If this persists, please sign out and sign back in.
                             </div>
                         )}
