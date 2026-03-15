@@ -1411,16 +1411,18 @@
             }, []);
 
             useEffect(() => {
+                const timeout = setTimeout(() => setAuthLoading(false), 5000);
                 sb.auth.getSession().then(({ data: { session } }) => {
+                    clearTimeout(timeout);
                     if (session?.user) { setUser(session.user); loadProfile(session.user.id); }
                     setAuthLoading(false);
-                });
+                }).catch(() => { clearTimeout(timeout); setAuthLoading(false); });
                 const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
                     if (session?.user) { setUser(session.user); await loadProfile(session.user.id); }
                     else { setUser(null); setProfile(null); }
                     if (event === 'SIGNED_IN') setCurrentPage('dashboard');
                 });
-                return () => subscription.unsubscribe();
+                return () => { clearTimeout(timeout); subscription.unsubscribe(); };
             }, [loadProfile]);
 
             const navigate = (page, params = {}) => { setCurrentPage(page); setPageParams(params); };
