@@ -35,7 +35,14 @@
         // Replace these with your project values from Supabase → Settings → API
         const SUPABASE_URL = 'https://tgsvhgxtpuibhtuiygsk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnc3ZoZ3h0cHVpYmh0dWl5Z3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDAxMTIsImV4cCI6MjA4OTA3NjExMn0.ZjTqDQfFd61uLvTSCgS3nHY0TF27pWgR5ca0JNLZG9o';
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                flowType: 'implicit',
+                detectSessionInUrl: true,
+                persistSession: true,
+                autoRefreshToken: true,
+            }
+        });
 
         // ── MASTER ADMIN CONFIG ───────────────────────────────────────────
         const MASTER_ADMIN_EMAIL = 'serelixai@gmail.com';
@@ -1206,12 +1213,22 @@
 
             const load = useCallback(async () => {
                 setLoading(true);
-                const [{ data: o }, { data: u }, { data: c }] = await Promise.all([
-                    sb.rpc('master_get_all_orgs'),
-                    sb.rpc('master_get_all_users'),
-                    sb.rpc('master_get_all_codes')
-                ]);
-                setOrgs(o || []); setAllUsers(u || []); setAllCodes(c || []);
+                try {
+                    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+                    const fetches = Promise.all([
+                        sb.rpc('master_get_all_orgs'),
+                        sb.rpc('master_get_all_users'),
+                        sb.rpc('master_get_all_codes')
+                    ]);
+                    const [{ data: o, error: e1 }, { data: u, error: e2 }, { data: c, error: e3 }] = await Promise.race([fetches, timeout]);
+                    if (e1) console.error('master_get_all_orgs:', e1.message);
+                    if (e2) console.error('master_get_all_users:', e2.message);
+                    if (e3) console.error('master_get_all_codes:', e3.message);
+                    setOrgs(o || []); setAllUsers(u || []); setAllCodes(c || []);
+                } catch(e) {
+                    console.error('Master admin data load failed:', e.message);
+                    toast('Failed to load data. Try refreshing.', 'error');
+                }
                 setLoading(false);
             }, []);
 
@@ -1251,7 +1268,17 @@
                 navigator.clipboard.writeText(code).then(() => toast('Copied to clipboard'));
             };
 
-            if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Spinner size={10} /></div>;
+            if (loading) return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center">
+                        <Spinner size={10} />
+                        <p className="text-gray-500 text-sm mt-3">Loading admin data...</p>
+                        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="text-xs text-gray-400 mt-4 hover:text-red-500 underline">
+                            Stuck? Click to reset session
+                        </button>
+                    </div>
+                </div>
+            );
 
             const totalOrgs = orgs.length;
             const totalUsers = allUsers.length;
@@ -1771,25 +1798,38 @@
             }, []);
 
             useEffect(() => {
-                const timeout = setTimeout(() => setAuthLoading(false), 5000);
+                let mounted = true;
+                const timeout = setTimeout(() => { if (mounted) setAuthLoading(false); }, 3000);
                 sb.auth.getSession().then(({ data: { session } }) => {
+                    if (!mounted) return;
                     clearTimeout(timeout);
                     if (session?.user) { setUser(session.user); loadProfile(session.user.id); }
                     setAuthLoading(false);
-                }).catch(() => { clearTimeout(timeout); setAuthLoading(false); });
+                }).catch((err) => {
+                    console.warn('getSession failed, recovering:', err?.message);
+                    clearTimeout(timeout);
+                    if (mounted) setAuthLoading(false);
+                });
                 const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+                    if (!mounted) return;
                     if (session?.user) { setUser(session.user); await loadProfile(session.user.id); }
                     else { setUser(null); setProfile(null); }
                     if (event === 'SIGNED_IN') setCurrentPage('dashboard');
                 });
-                return () => { clearTimeout(timeout); subscription.unsubscribe(); };
+                return () => { mounted = false; clearTimeout(timeout); subscription.unsubscribe(); };
             }, [loadProfile]);
 
             const navigate = (page, params = {}) => { setCurrentPage(page); setPageParams(params); };
 
             if (authLoading) return (
                 <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                    <div className="text-center"><Spinner size={10} /><p className="text-gray-500 text-sm mt-3">Loading TalentFlow...</p></div>
+                    <div className="text-center">
+                        <Spinner size={10} />
+                        <p className="text-gray-500 text-sm mt-3">Loading TalentFlow...</p>
+                        <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="text-xs text-gray-400 mt-4 hover:text-red-500 underline">
+                            Stuck? Click to reset session
+                        </button>
+                    </div>
                 </div>
             );
 
