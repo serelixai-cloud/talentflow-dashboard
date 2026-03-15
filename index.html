@@ -31,16 +31,19 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useCallback, createContext, useContext } = React;
 
-        // ââ SUPABASE CONFIG âââââââââââââââââââââââââââââââââââââââââââââââââ
-        // Replace these with your project values from Supabase â Settings â API
+        // ── SUPABASE CONFIG ─────────────────────────────────────────────────
+        // Replace these with your project values from Supabase → Settings → API
         const SUPABASE_URL = 'https://tgsvhgxtpuibhtuiygsk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnc3ZoZ3h0cHVpYmh0dWl5Z3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDAxMTIsImV4cCI6MjA4OTA3NjExMn0.ZjTqDQfFd61uLvTSCgS3nHY0TF27pWgR5ca0JNLZG9o';
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ââ APP CONTEXT âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── MASTER ADMIN CONFIG ───────────────────────────────────────────
+        const MASTER_ADMIN_EMAIL = 'serelixai@gmail.com';
+
+        // ── APP CONTEXT ─────────────────────────────────────────────────────
         const AppCtx = createContext({ orgId: null, user: null, profile: null, toast: () => {} });
 
-        // ââ UTILITIES âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── UTILITIES ───────────────────────────────────────────────────────
         function Toast({ message, type, onDismiss }) {
             useEffect(() => { const t = setTimeout(onDismiss, 4000); return () => clearTimeout(t); }, [onDismiss]);
             return <div className={`toast ${type === 'error' ? 'toast-error' : ''}`}><p className="text-sm text-gray-800">{message}</p></div>;
@@ -87,7 +90,7 @@
             );
         }
 
-        // ââ AUTH PAGE âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── AUTH PAGE ───────────────────────────────────────────────────────
         function AuthPage() {
             const [mode, setMode] = useState('login');
             const [email, setEmail] = useState('');
@@ -175,7 +178,7 @@
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
                                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleSignup())} />
                                 <button onClick={mode === 'login' ? handleLogin : handleSignup} disabled={loading}
                                     className="w-full py-2.5 emerald-gradient text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
@@ -195,7 +198,7 @@
             );
         }
 
-        // ââ NAVBAR ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── NAVBAR ──────────────────────────────────────────────────────────
         function Navbar({ currentPage, onNavigate }) {
             const { profile } = useContext(AppCtx);
             const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -219,7 +222,10 @@
                             <button onClick={() => onNavigate('nova')} className={`text-sm font-medium ${currentPage === 'nova' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Nova</button>
                             <Dropdown label="Organisation" items={[{id:'members',label:'Members'},{id:'leaderboard',label:'Leaderboard'}]} onSelect={i => onNavigate('org-' + i.id)} />
                             {profile?.role === 'Owner' && (
-                                <button onClick={() => onNavigate('admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:text-red-600 hover:bg-red-50'}`}>â Admin</button>
+                                <button onClick={() => onNavigate('admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:text-red-600 hover:bg-red-50'}`}>⚙ Admin</button>
+                            )}
+                            {profile?.email === MASTER_ADMIN_EMAIL && (
+                                <button onClick={() => onNavigate('master-admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'master-admin' ? 'text-purple-700 bg-purple-50' : 'text-purple-500 hover:text-purple-600 hover:bg-purple-50'}`}>⚡ Master</button>
                             )}
                         </div>
                     </div>
@@ -247,7 +253,7 @@
             );
         }
 
-        // ââ DASHBOARD PAGE ââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── DASHBOARD PAGE ──────────────────────────────────────────────────
         function DashboardPage() {
             const { orgId } = useContext(AppCtx);
             const [stats, setStats] = useState({ total: 0, hired: 0, rate: 0, pipelines: 0 });
@@ -335,7 +341,7 @@
                             {recentCandidates.length > 0 ? recentCandidates.map(c => (
                                 <div key={c.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">{(c.name||'?').charAt(0)}</div>
-                                    <div className="min-w-0"><p className="text-sm font-medium text-gray-900 truncate">{c.name}</p><p className="text-xs text-gray-500">{c.stage} Â· {c.source || 'Unknown'}</p></div>
+                                    <div className="min-w-0"><p className="text-sm font-medium text-gray-900 truncate">{c.name}</p><p className="text-xs text-gray-500">{c.stage} · {c.source || 'Unknown'}</p></div>
                                 </div>
                             )) : <p className="text-sm text-gray-400 text-center py-8">No candidates yet</p>}
                         </div>
@@ -354,7 +360,7 @@
             );
         }
 
-        // ââ PIPELINES PAGE ââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── PIPELINES PAGE ──────────────────────────────────────────────────
         function PipelinesPage({ onNavigate }) {
             const { orgId, toast } = useContext(AppCtx);
             const [pipelines, setPipelines] = useState([]);
@@ -435,7 +441,7 @@
             );
         }
 
-        // ââ PIPELINE DETAIL PAGE ââââââââââââââââââââââââââââââââââââââââââââ
+        // ── PIPELINE DETAIL PAGE ────────────────────────────────────────────
         function PipelineDetailPage({ pipeline, onBack }) {
             const { orgId, toast } = useContext(AppCtx);
             const stages = ['Applied', 'Screening', 'Interview', 'Technical', 'Final Round', 'Offer', 'Hired', 'Rejected'];
@@ -534,7 +540,7 @@
                                     </select>
                                 </div>
                                 <div className="mb-4">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Score (0â100)</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Score (0–100)</label>
                                     <input type="number" min="0" max="100" value={form.score} onChange={e => setForm(x => ({...x, score: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                                 </div>
                                 <div className="flex gap-3">
@@ -552,7 +558,7 @@
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <h2 className="text-xl font-bold text-gray-900">{selected.name}</h2>
-                                        <p className="text-sm text-gray-500 mt-0.5">{selected.email} {selected.phone ? 'Â· '+selected.phone : ''}</p>
+                                        <p className="text-sm text-gray-500 mt-0.5">{selected.email} {selected.phone ? '· '+selected.phone : ''}</p>
                                     </div>
                                     <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
                                 </div>
@@ -579,7 +585,7 @@
             );
         }
 
-        // ââ CANDIDATES OVERVIEW PAGE ââââââââââââââââââââââââââââââââââââââââ
+        // ── CANDIDATES OVERVIEW PAGE ────────────────────────────────────────
         function CandidatesOverviewPage() {
             const { orgId, toast } = useContext(AppCtx);
             const [candidates, setCandidates] = useState([]);
@@ -661,9 +667,9 @@
                                 {filtered.map(c => (
                                     <tr key={c.id} onClick={() => setSelected(c)} className="hover:bg-gray-50 cursor-pointer">
                                         <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">{c.name.charAt(0)}</div><div><p className="text-sm font-medium text-gray-900">{c.name}</p><p className="text-xs text-gray-500">{c.email}</p></div></div></td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">{c.pipeline_name || 'â'}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{c.pipeline_name || '—'}</td>
                                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${c.stage==='Hired'?'bg-emerald-100 text-emerald-700':c.stage==='Rejected'?'bg-red-100 text-red-700':'bg-blue-100 text-blue-700'}`}>{c.stage}</span></td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">{c.source||'â'}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600">{c.source||'—'}</td>
                                         <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-16 bg-gray-100 rounded-full h-1.5"><div className="bg-emerald-500 h-1.5 rounded-full" style={{width:(c.score||0)+'%'}}/></div><span className="text-xs text-gray-600">{c.score||0}</span></div></td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
                                     </tr>
@@ -679,10 +685,10 @@
                                 {[['name','Full Name *'],['email','Email'],['phone','Phone']].map(([f,l]) => (
                                     <div key={f} className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">{l}</label><input value={form[f]} onChange={e => setForm(x => ({...x, [f]: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                                 ))}
-                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Pipeline</label><select value={form.pipeline_id} onChange={e => setForm(x => ({...x, pipeline_id: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">â No pipeline â</option>{pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Pipeline</label><select value={form.pipeline_id} onChange={e => setForm(x => ({...x, pipeline_id: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">— No pipeline —</option>{pipelines.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
                                 <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Source</label><select value={form.source} onChange={e => setForm(x => ({...x, source: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['LinkedIn','Indeed','Referral','Job Board','Career Site','Agent','Other'].map(s => <option key={s}>{s}</option>)}</select></div>
                                 <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Stage</label><select value={form.stage} onChange={e => setForm(x => ({...x, stage: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['Applied','Screening','Interview','Technical','Final Round','Offer','Hired','Rejected'].map(s => <option key={s}>{s}</option>)}</select></div>
-                                <div className="mb-4"><label className="block text-xs font-medium text-gray-700 mb-1">Score (0â100)</label><input type="number" min="0" max="100" value={form.score} onChange={e => setForm(x => ({...x, score: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                                <div className="mb-4"><label className="block text-xs font-medium text-gray-700 mb-1">Score (0–100)</label><input type="number" min="0" max="100" value={form.score} onChange={e => setForm(x => ({...x, score: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
                                 <div className="flex gap-3"><button onClick={() => setShowAdd(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button onClick={addCandidate} disabled={saving||!form.name} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null} Add</button></div>
                             </div>
                         </div>
@@ -691,7 +697,7 @@
                         <div className="modal-overlay" onClick={() => setSelected(null)}>
                             <div className="modal-content w-2xl p-8" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-start mb-4">
-                                    <div><h2 className="text-xl font-bold text-gray-900">{selected.name}</h2><p className="text-sm text-gray-500 mt-0.5">{selected.email} {selected.phone ? 'Â· '+selected.phone : ''}</p></div>
+                                    <div><h2 className="text-xl font-bold text-gray-900">{selected.name}</h2><p className="text-sm text-gray-500 mt-0.5">{selected.email} {selected.phone ? '· '+selected.phone : ''}</p></div>
                                     <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
                                 </div>
                                 <div className="flex flex-wrap gap-2 mb-4">{['Applied','Screening','Interview','Technical','Final Round','Offer','Hired','Rejected'].map(s => <button key={s} onClick={() => updateStage(selected.id, s)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${selected.stage===s?'emerald-gradient text-white border-transparent':'border-gray-200 text-gray-600 hover:border-emerald-300'}`}>{s}</button>)}</div>
@@ -704,7 +710,7 @@
             );
         }
 
-        // ââ DUPLICATES PAGE âââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── DUPLICATES PAGE ─────────────────────────────────────────────────
         function DuplicatesPage() {
             const { orgId, toast } = useContext(AppCtx);
             const [dupes, setDupes] = useState([]);
@@ -732,14 +738,14 @@
                     ) : dupes.map((group, i) => (
                         <div key={i} className="bg-white rounded-xl border border-orange-200 p-4 mb-3 shadow-sm">
                             <p className="text-xs font-semibold text-orange-600 mb-2 uppercase">Duplicate: {group[0].email}</p>
-                            {group.map(c => <div key={c.id} className="flex justify-between items-center py-2 border-b last:border-0"><span className="text-sm text-gray-900">{c.name}</span><span className="text-xs text-gray-500">{c.pipeline_name||'No pipeline'} Â· {c.stage}</span></div>)}
+                            {group.map(c => <div key={c.id} className="flex justify-between items-center py-2 border-b last:border-0"><span className="text-sm text-gray-900">{c.name}</span><span className="text-xs text-gray-500">{c.pipeline_name||'No pipeline'} · {c.stage}</span></div>)}
                         </div>
                     ))}
                 </div>
             );
         }
 
-        // ââ TEMPLATES PAGE ââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── TEMPLATES PAGE ──────────────────────────────────────────────────
         function TemplatesPage() {
             const { orgId, toast } = useContext(AppCtx);
             const [templates, setTemplates] = useState([]);
@@ -839,7 +845,7 @@
             );
         }
 
-        // ââ NOVA PAGE âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── NOVA PAGE ───────────────────────────────────────────────────────
         function NovaPage() {
             const { orgId, toast } = useContext(AppCtx);
             const [sessions, setSessions] = useState([]);
@@ -901,7 +907,7 @@
                             <div className="modal-content w-96 p-6" onClick={e => e.stopPropagation()}>
                                 <h2 className="text-lg font-bold text-gray-900 mb-4">Log Screening Session</h2>
                                 <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Candidate Name *</label><input value={form.candidate_name} onChange={e => setForm(x=>({...x,candidate_name:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
-                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Score (0â100)</label><input type="number" value={form.score} onChange={e => setForm(x=>({...x,score:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                                <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Score (0–100)</label><input type="number" value={form.score} onChange={e => setForm(x=>({...x,score:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
                                 <div className="mb-3"><label className="block text-xs font-medium text-gray-700 mb-1">Status</label><select value={form.status} onChange={e => setForm(x=>({...x,status:e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">{['Passed','Failed','Pending'].map(s=><option key={s}>{s}</option>)}</select></div>
                                 <div className="flex gap-3"><button onClick={() => setShowAdd(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button><button onClick={addSession} disabled={saving||!form.candidate_name} className="flex-1 py-2 emerald-gradient text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null} Save</button></div>
                             </div>
@@ -911,7 +917,7 @@
                         <div className="modal-overlay" onClick={() => setSelected(null)}>
                             <div className="modal-content w-lg p-8" onClick={e => e.stopPropagation()}>
                                 <h2 className="text-xl font-bold text-gray-900 mb-1">{selected.candidate_name}</h2>
-                                <p className="text-gray-500 text-sm mb-4">Score: {selected.score} Â· Status: {selected.status} Â· {selected.session_date}</p>
+                                <p className="text-gray-500 text-sm mb-4">Score: {selected.score} · Status: {selected.status} · {selected.session_date}</p>
                                 {(selected.questions||[]).length > 0 && (<><h3 className="font-semibold text-gray-900 mb-3">Q&A Review</h3>{selected.questions.map((q,i) => <div key={i} className="bg-gray-50 p-4 rounded mb-3"><p className="font-medium text-gray-900 text-sm">Q: {q.q}</p><p className="text-gray-700 mt-1 text-sm">A: {q.a}</p><p className="text-xs text-gray-400 mt-1">Score: {q.score}</p></div>)}</>)}
                                 <button onClick={() => setSelected(null)} className="w-full py-2 emerald-gradient text-white rounded-lg mt-4 text-sm">Close</button>
                             </div>
@@ -921,7 +927,7 @@
             );
         }
 
-        // ââ ORGANISATION PAGE ââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── ORGANISATION PAGE ────────────────────────────────────────────────
         function OrganisationPage({ tab }) {
             const { orgId, toast } = useContext(AppCtx);
             const [members, setMembers] = useState([]);
@@ -942,7 +948,7 @@
             const inviteMember = async () => {
                 if (!inviteEmail) return;
                 setSaving(true);
-                // Sign up via Supabase Auth â they'll get an email confirmation
+                // Sign up via Supabase Auth — they'll get an email confirmation
                 const { data: { user }, error } = await sb.auth.admin ?
                     { data: { user: null }, error: { message: 'Use Supabase dashboard to invite users with admin rights' } } :
                     await sb.auth.signUp({ email: inviteEmail, password: Math.random().toString(36).slice(2) + 'Tf1!' });
@@ -1021,7 +1027,7 @@
             return <div className="p-6"><h1 className="text-2xl font-bold text-gray-900">{tab}</h1></div>;
         }
 
-        // ââ ADMIN PAGE (Owner only) ââââââââââââââââââââââââââââââââââââââââââ
+        // ── ADMIN PAGE (Owner only) ──────────────────────────────────────────
         function AdminPage() {
             const { profile, toast } = useContext(AppCtx);
             const [tab, setTab] = useState('codes');
@@ -1032,7 +1038,7 @@
             const [saving, setSaving] = useState(false);
 
             if (profile?.role !== 'Owner') return (
-                <div className="p-12 text-center text-gray-500 text-sm">Access denied â Owner role required.</div>
+                <div className="p-12 text-center text-gray-500 text-sm">Access denied — Owner role required.</div>
             );
 
             const load = useCallback(async () => {
@@ -1086,7 +1092,7 @@
                                 <h2 className="text-sm font-semibold text-gray-900 mb-1">Generate Invite Code</h2>
                                 <p className="text-xs text-gray-500 mb-3">Each code allows one person to sign up. Share the code directly with them.</p>
                                 <div className="flex gap-3">
-                                    <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Optional note â e.g. 'Acme Corp trial'" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                    <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Optional note — e.g. 'Acme Corp trial'" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                                     <button onClick={generateCode} disabled={saving} className="emerald-gradient text-white px-5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-60">{saving ? <Spinner size={4}/> : null}Generate</button>
                                 </div>
                             </div>
@@ -1097,14 +1103,14 @@
                                         {codes.map(c => (
                                             <tr key={c.id} className="hover:bg-gray-50">
                                                 <td className="px-5 py-4"><code className="text-sm font-mono bg-emerald-50 text-emerald-700 px-2 py-1 rounded tracking-wider">{c.code}</code></td>
-                                                <td className="px-5 py-4 text-sm text-gray-500">{c.note || <span className="text-gray-300">â</span>}</td>
+                                                <td className="px-5 py-4 text-sm text-gray-500">{c.note || <span className="text-gray-300">—</span>}</td>
                                                 <td className="px-5 py-4 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
                                                 <td className="px-5 py-4"><span className={`text-xs px-2 py-1 rounded font-medium ${c.uses_count >= c.max_uses ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'}`}>{c.uses_count >= c.max_uses ? 'Used' : 'Available'}</span></td>
-                                                <td className="px-5 py-4 text-xs text-gray-400">{c.used_by ? (users.find(u => u.id === c.used_by)?.email || c.used_by.slice(0,8)+'â¦') : <span className="text-gray-300">â</span>}</td>
+                                                <td className="px-5 py-4 text-xs text-gray-400">{c.used_by ? (users.find(u => u.id === c.used_by)?.email || c.used_by.slice(0,8)+'…') : <span className="text-gray-300">—</span>}</td>
                                                 <td className="px-5 py-4"><button onClick={() => deleteCode(c.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button></td>
                                             </tr>
                                         ))}
-                                        {codes.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No invite codes yet â generate one above</td></tr>}
+                                        {codes.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No invite codes yet — generate one above</td></tr>}
                                     </tbody>
                                 </table>
                             </div>
@@ -1142,7 +1148,249 @@
             );
         }
 
-        // ââ APP ROOT âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+        // ── MASTER ADMIN PAGE (Super Admin only) ─────────────────────────────
+        function MasterAdminPage() {
+            const { user, profile, toast } = useContext(AppCtx);
+            const [tab, setTab] = useState('overview');
+            const [orgs, setOrgs] = useState([]);
+            const [allUsers, setAllUsers] = useState([]);
+            const [allCodes, setAllCodes] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            if (profile?.email !== MASTER_ADMIN_EMAIL) return (
+                <div className="p-12 text-center text-gray-500 text-sm">Access denied — Master Admin only.</div>
+            );
+
+            const load = useCallback(async () => {
+                setLoading(true);
+                const [{ data: o }, { data: u }, { data: c }] = await Promise.all([
+                    sb.rpc('master_get_all_orgs'),
+                    sb.rpc('master_get_all_users'),
+                    sb.rpc('master_get_all_codes')
+                ]);
+                setOrgs(o || []); setAllUsers(u || []); setAllCodes(c || []);
+                setLoading(false);
+            }, []);
+
+            useEffect(() => { load(); }, [load]);
+
+            const suspendUser = async (id) => {
+                await sb.rpc('master_set_user_status', { p_user_id: id, p_status: 'suspended' });
+                toast('User suspended'); await load();
+            };
+            const activateUser = async (id) => {
+                await sb.rpc('master_set_user_status', { p_user_id: id, p_status: 'active' });
+                toast('User activated'); await load();
+            };
+            const deleteOrg = async (id) => {
+                if (!confirm('Delete this organization and all its data? This cannot be undone.')) return;
+                await sb.rpc('master_delete_org', { p_org_id: id });
+                toast('Organization deleted'); await load();
+            };
+
+            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+
+            const totalOrgs = orgs.length;
+            const totalUsers = allUsers.length;
+            const activeUsers = allUsers.filter(u => (u.status || 'active') === 'active').length;
+            const suspendedUsers = allUsers.filter(u => u.status === 'suspended').length;
+            const codesUsed = allCodes.filter(c => c.uses_count >= c.max_uses).length;
+            const codesAvail = allCodes.length - codesUsed;
+            const last7d = allUsers.filter(u => new Date(u.created_at) > new Date(Date.now() - 7*86400000)).length;
+            const last30d = allUsers.filter(u => new Date(u.created_at) > new Date(Date.now() - 30*86400000)).length;
+
+            const tabs = [{id:'overview',label:'Overview'},{id:'orgs',label:'Organizations'},{id:'users',label:'All Users'},{id:'codes',label:'All Invite Codes'},{id:'analytics',label:'Analytics'}];
+
+            return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Master Admin Console</h1>
+                            <p className="text-sm text-gray-500 mt-1">Global platform management — all organizations & users</p>
+                        </div>
+                        <span className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold">Super Admin</span>
+                    </div>
+
+                    <div className="flex gap-2 mb-6 flex-wrap">
+                        {tabs.map(t => (
+                            <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.id ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{t.label}</button>
+                        ))}
+                    </div>
+
+                    {tab === 'overview' && (
+                        <div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                {[
+                                    { label: 'Total Organizations', val: totalOrgs, color: 'text-purple-600', bg: 'bg-purple-50' },
+                                    { label: 'Total Users', val: totalUsers, color: 'text-blue-600', bg: 'bg-blue-50' },
+                                    { label: 'Active Users', val: activeUsers, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                    { label: 'Suspended', val: suspendedUsers, color: 'text-red-600', bg: 'bg-red-50' },
+                                    { label: 'Signups (7 days)', val: last7d, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                                    { label: 'Signups (30 days)', val: last30d, color: 'text-cyan-600', bg: 'bg-cyan-50' },
+                                    { label: 'Codes Available', val: codesAvail, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                    { label: 'Codes Used', val: codesUsed, color: 'text-gray-600', bg: 'bg-gray-50' }
+                                ].map((s, i) => (
+                                    <div key={i} className={`${s.bg} rounded-xl p-4 border border-gray-100`}>
+                                        <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+                                        <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.val}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Signups</h3>
+                                <div className="space-y-2">
+                                    {allUsers.slice(0, 8).map(u => (
+                                        <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xs font-bold">{(u.name||'?').charAt(0).toUpperCase()}</div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900">{u.name || 'Unnamed'}</p>
+                                                    <p className="text-xs text-gray-400">{u.email} — {u.org_name || 'No org'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span>
+                                                <span className="text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {allUsers.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No users yet</p>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 'orgs' && (
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>{['Organization','Members','Created','Actions'].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {orgs.map(o => (
+                                        <tr key={o.id} className="hover:bg-gray-50">
+                                            <td className="px-5 py-4">
+                                                <p className="text-sm font-medium text-gray-900">{o.name}</p>
+                                                <p className="text-xs text-gray-400 font-mono">{o.id.slice(0,8)}…</p>
+                                            </td>
+                                            <td className="px-5 py-4"><span className="text-sm font-semibold text-gray-700">{o.member_count}</span> <span className="text-xs text-gray-400">users</span></td>
+                                            <td className="px-5 py-4 text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString()}</td>
+                                            <td className="px-5 py-4"><button onClick={() => deleteOrg(o.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete Org</button></td>
+                                        </tr>
+                                    ))}
+                                    {orgs.length === 0 && <tr><td colSpan={4} className="text-center py-12 text-gray-400 text-sm">No organizations</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {tab === 'users' && (
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>{['User','Email','Organization','Role','Status','Joined','Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {allUsers.map(u => (
+                                        <tr key={u.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.name || '—'}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">{u.email}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-500">{u.org_name || '—'}</td>
+                                            <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span></td>
+                                            <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${(u.status||'active') === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{u.status||'active'}</span></td>
+                                            <td className="px-4 py-3 text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                                            <td className="px-4 py-3">
+                                                {u.email !== MASTER_ADMIN_EMAIL && (
+                                                    <div className="flex gap-2">
+                                                        {(u.status||'active') !== 'suspended' ? (
+                                                            <button onClick={() => suspendUser(u.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Suspend</button>
+                                                        ) : (
+                                                            <button onClick={() => activateUser(u.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Activate</button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {allUsers.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No users</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {tab === 'codes' && (
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 border-b"><tr>{['Code','Note','Created By','Status','Used By','Created'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {allCodes.map(c => (
+                                        <tr key={c.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3"><code className="text-sm font-mono bg-purple-50 text-purple-700 px-2 py-1 rounded">{c.code}</code></td>
+                                            <td className="px-4 py-3 text-sm text-gray-500">{c.note || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-400">{c.creator_email || '—'}</td>
+                                            <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${c.uses_count >= c.max_uses ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'}`}>{c.uses_count >= c.max_uses ? 'Used' : 'Available'}</span></td>
+                                            <td className="px-4 py-3 text-xs text-gray-400">{c.user_email || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                    {allCodes.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No invite codes</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {tab === 'analytics' && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                <h3 className="text-sm font-semibold text-gray-900 mb-4">User Growth</h3>
+                                <div className="grid grid-cols-6 gap-1 items-end h-40">
+                                    {(() => {
+                                        const months = [];
+                                        for (let i = 5; i >= 0; i--) {
+                                            const d = new Date(); d.setMonth(d.getMonth() - i);
+                                            const label = d.toLocaleDateString('en-US', {month:'short', year:'2-digit'});
+                                            const count = allUsers.filter(u => { const ud = new Date(u.created_at); return ud.getMonth() === d.getMonth() && ud.getFullYear() === d.getFullYear(); }).length;
+                                            months.push({ label, count });
+                                        }
+                                        const max = Math.max(...months.map(m => m.count), 1);
+                                        return months.map((m, i) => (
+                                            <div key={i} className="flex flex-col items-center gap-1">
+                                                <span className="text-xs font-semibold text-purple-600">{m.count}</span>
+                                                <div className="w-full bg-purple-200 rounded-t" style={{height: `${(m.count/max)*100}%`, minHeight: m.count > 0 ? '8px' : '2px'}}></div>
+                                                <span className="text-xs text-gray-400">{m.label}</span>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Roles Breakdown</h3>
+                                    {(() => {
+                                        const roles = {};
+                                        allUsers.forEach(u => { roles[u.role] = (roles[u.role] || 0) + 1; });
+                                        return Object.entries(roles).map(([role, count]) => (
+                                            <div key={role} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                                                <span className={`text-xs px-2 py-1 rounded font-medium ${role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{role}</span>
+                                                <span className="text-sm font-semibold text-gray-700">{count}</span>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Organizations</h3>
+                                    {orgs.sort((a,b) => b.member_count - a.member_count).slice(0,5).map(o => (
+                                        <div key={o.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                                            <span className="text-sm text-gray-700">{o.name}</span>
+                                            <span className="text-sm font-semibold text-purple-600">{o.member_count} users</span>
+                                        </div>
+                                    ))}
+                                    {orgs.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No organizations</p>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ── APP ROOT ─────────────────────────────────────────────────────────
         function App() {
             const [user, setUser] = useState(null);
             const [profile, setProfile] = useState(null);
@@ -1197,6 +1445,7 @@
                 if (currentPage === 'nova') return <NovaPage />;
                 if (currentPage.startsWith('org-')) return <OrganisationPage tab={currentPage.replace('org-','')} />;
                 if (currentPage === 'admin') return <AdminPage />;
+                if (currentPage === 'master-admin') return <MasterAdminPage />;
                 return <DashboardPage />;
             };
 
