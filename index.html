@@ -1084,13 +1084,13 @@
                 const part1 = Math.random().toString(36).slice(2, 8).toUpperCase();
                 const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
                 const code = part1 + '-' + part2;
-                const { error } = await sb.from('invite_codes').insert({ code, note: newNote || null });
+                const { error } = await sb.rpc('master_generate_code', { p_code: code, p_note: newNote || null, p_max_uses: 1 });
                 if (error) { toast(error.message, 'error'); } else { toast('Code generated: ' + code); setNewNote(''); await load(); }
                 setSaving(false);
             };
 
             const deleteCode = async (id) => {
-                await sb.from('invite_codes').delete().eq('id', id);
+                await sb.rpc('master_delete_code', { p_code_id: id });
                 toast('Code deleted'); await load();
             };
 
@@ -1176,7 +1176,7 @@
         }
 
         // ── MASTER ADMIN PAGE (Super Admin only) ─────────────────────────────
-        function MasterAdminPage({ activeTab }) {
+        function MasterAdminPage({ activeTab, onNavigate }) {
             const { user, profile, toast } = useContext(AppCtx);
             const [orgs, setOrgs] = useState([]);
             const [allUsers, setAllUsers] = useState([]);
@@ -1228,14 +1228,14 @@
                 const part1 = Math.random().toString(36).slice(2, 8).toUpperCase();
                 const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
                 const code = part1 + '-' + part2;
-                const { error } = await sb.from('invite_codes').insert({ code, note: newNote || null, max_uses: parseInt(newMaxUses) || 1, uses_count: 0, created_by: user.id });
+                const { error } = await sb.rpc('master_generate_code', { p_code: code, p_note: newNote || null, p_max_uses: parseInt(newMaxUses) || 1 });
                 if (error) { toast(error.message, 'error'); } else { toast('Invite code generated: ' + code); setNewNote(''); setNewMaxUses(1); await load(); }
                 setSaving(false);
             };
 
             const deleteCode = async (id) => {
                 if (!confirm('Delete this invite code?')) return;
-                await sb.from('invite_codes').delete().eq('id', id);
+                await sb.rpc('master_delete_code', { p_code_id: id });
                 toast('Code deleted'); await load();
             };
 
@@ -1326,15 +1326,15 @@
                             <h3 className="text-sm font-semibold text-gray-900">Quick Actions</h3>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                            <button onClick={() => {}} className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
+                            <button onClick={() => onNavigate('master-codes')} className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
                                 <p className="text-sm font-semibold text-gray-900">Generate Invite Code</p>
                                 <p className="text-xs text-gray-500 mt-1">Create a new code for customer onboarding</p>
                             </button>
-                            <button className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
+                            <button onClick={() => onNavigate('master-customers')} className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
                                 <p className="text-sm font-semibold text-gray-900">View All Customers</p>
                                 <p className="text-xs text-gray-500 mt-1">Manage organizations and subscriptions</p>
                             </button>
-                            <button className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
+                            <button onClick={() => onNavigate('master-analytics')} className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
                                 <p className="text-sm font-semibold text-gray-900">Platform Analytics</p>
                                 <p className="text-xs text-gray-500 mt-1">Track product performance and growth</p>
                             </button>
@@ -1787,14 +1787,14 @@
 
             const renderPage = () => {
                 // Master admin pages
-                if (effectivePage === 'master-overview') return <MasterAdminPage activeTab="overview" />;
-                if (effectivePage === 'master-customers') return <MasterAdminPage activeTab="customers" />;
-                if (effectivePage === 'master-users') return <MasterAdminPage activeTab="users" />;
-                if (effectivePage === 'master-codes') return <MasterAdminPage activeTab="codes" />;
-                if (effectivePage === 'master-analytics') return <MasterAdminPage activeTab="analytics" />;
-                if (effectivePage === 'master-settings') return <MasterAdminPage activeTab="settings" />;
+                if (effectivePage === 'master-overview') return <MasterAdminPage activeTab="overview" onNavigate={navigate} />;
+                if (effectivePage === 'master-customers') return <MasterAdminPage activeTab="customers" onNavigate={navigate} />;
+                if (effectivePage === 'master-users') return <MasterAdminPage activeTab="users" onNavigate={navigate} />;
+                if (effectivePage === 'master-codes') return <MasterAdminPage activeTab="codes" onNavigate={navigate} />;
+                if (effectivePage === 'master-analytics') return <MasterAdminPage activeTab="analytics" onNavigate={navigate} />;
+                if (effectivePage === 'master-settings') return <MasterAdminPage activeTab="settings" onNavigate={navigate} />;
                 // Legacy route
-                if (effectivePage === 'master-admin') return <MasterAdminPage activeTab="overview" />;
+                if (effectivePage === 'master-admin') return <MasterAdminPage activeTab="overview" onNavigate={navigate} />;
                 // Regular app pages
                 if (effectivePage === 'dashboard') return <DashboardPage />;
                 if (effectivePage === 'pipelines') return <PipelinesPage onNavigate={navigate} />;
