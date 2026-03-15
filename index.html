@@ -203,6 +203,7 @@
             const { profile } = useContext(AppCtx);
             const [userMenuOpen, setUserMenuOpen] = useState(false);
             const userRef = useRef(null);
+            const isMaster = profile?.email === MASTER_ADMIN_EMAIL;
             useEffect(() => {
                 const h = e => { if (userRef.current && !userRef.current.contains(e.target)) setUserMenuOpen(false); };
                 if (userMenuOpen) { document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }
@@ -210,30 +211,56 @@
 
             const handleSignOut = async () => { await sb.auth.signOut(); };
 
+            const masterNavBtn = (page, label, icon) => (
+                <button onClick={() => onNavigate(page)} className={`text-sm font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${currentPage === page ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'}`}>
+                    {icon && <span className="text-base">{icon}</span>}{label}
+                </button>
+            );
+
             return (
-                <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+                <nav className={`${isMaster ? 'bg-gray-900' : 'bg-white'} border-b ${isMaster ? 'border-gray-700' : 'border-gray-200'} px-6 py-3 flex items-center justify-between sticky top-0 z-40`}>
                     <div className="flex items-center gap-8">
-                        <Logo />
-                        <div className="flex items-center gap-6">
-                            <button onClick={() => onNavigate('dashboard')} className={`text-sm font-medium ${currentPage === 'dashboard' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Dashboard</button>
-                            <button onClick={() => onNavigate('pipelines')} className={`text-sm font-medium ${currentPage === 'pipelines' || currentPage.startsWith('pipeline-detail') ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Pipelines</button>
-                            <Dropdown label="Candidates" items={[{id:'overview',label:'Overview'},{id:'duplicates',label:'Duplicates'}]} onSelect={i => onNavigate('candidates-' + i.id)} />
-                            <button onClick={() => onNavigate('templates')} className={`text-sm font-medium ${currentPage === 'templates' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Templates</button>
-                            <button onClick={() => onNavigate('nova')} className={`text-sm font-medium ${currentPage === 'nova' ? 'text-emerald-600' : 'text-gray-700 hover:text-emerald-600'}`}>Nova</button>
-                            <Dropdown label="Organisation" items={[{id:'members',label:'Members'},{id:'leaderboard',label:'Leaderboard'}]} onSelect={i => onNavigate('org-' + i.id)} />
-                            {profile?.role === 'Owner' && (
-                                <button onClick={() => onNavigate('admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:text-red-600 hover:bg-red-50'}`}>⚙ Admin</button>
-                            )}
-                            {profile?.email === MASTER_ADMIN_EMAIL && (
-                                <button onClick={() => onNavigate('master-admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'master-admin' ? 'text-purple-700 bg-purple-50' : 'text-purple-500 hover:text-purple-600 hover:bg-purple-50'}`}>⚡ Master</button>
+                        {isMaster ? (
+                            <div className="flex items-center gap-3">
+                                <div className="bg-purple-600 w-8 h-8 rounded flex items-center justify-center">
+                                    <span className="text-white font-bold text-sm">TF</span>
+                                </div>
+                                <div>
+                                    <span className="font-semibold text-white text-sm">TalentFlow.ai</span>
+                                    <span className="text-purple-400 text-xs ml-2 font-medium">Admin Console</span>
+                                </div>
+                            </div>
+                        ) : <Logo />}
+                        <div className="flex items-center gap-1">
+                            {isMaster ? (
+                                <>
+                                    {masterNavBtn('master-overview', 'Overview', null)}
+                                    {masterNavBtn('master-customers', 'Customers', null)}
+                                    {masterNavBtn('master-users', 'Users', null)}
+                                    {masterNavBtn('master-codes', 'Invite Codes', null)}
+                                    {masterNavBtn('master-analytics', 'Analytics', null)}
+                                    {masterNavBtn('master-settings', 'Settings', null)}
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={() => onNavigate('dashboard')} className={`text-sm font-medium px-3 py-1.5 rounded-lg ${currentPage === 'dashboard' ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700 hover:text-emerald-600'}`}>Dashboard</button>
+                                    <button onClick={() => onNavigate('pipelines')} className={`text-sm font-medium px-3 py-1.5 rounded-lg ${currentPage === 'pipelines' || currentPage.startsWith('pipeline-detail') ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700 hover:text-emerald-600'}`}>Pipelines</button>
+                                    <Dropdown label="Candidates" items={[{id:'overview',label:'Overview'},{id:'duplicates',label:'Duplicates'}]} onSelect={i => onNavigate('candidates-' + i.id)} />
+                                    <button onClick={() => onNavigate('templates')} className={`text-sm font-medium px-3 py-1.5 rounded-lg ${currentPage === 'templates' ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700 hover:text-emerald-600'}`}>Templates</button>
+                                    <button onClick={() => onNavigate('nova')} className={`text-sm font-medium px-3 py-1.5 rounded-lg ${currentPage === 'nova' ? 'text-emerald-600 bg-emerald-50' : 'text-gray-700 hover:text-emerald-600'}`}>Nova</button>
+                                    <Dropdown label="Organisation" items={[{id:'members',label:'Members'},{id:'leaderboard',label:'Leaderboard'}]} onSelect={i => onNavigate('org-' + i.id)} />
+                                    {profile?.role === 'Owner' && (
+                                        <button onClick={() => onNavigate('admin')} className={`text-sm font-medium px-2 py-1 rounded ${currentPage === 'admin' ? 'text-red-600 bg-red-50' : 'text-red-500 hover:text-red-600 hover:bg-red-50'}`}>Admin</button>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium">{profile?.role || 'Admin'}</span>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${isMaster ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{isMaster ? 'Super Admin' : (profile?.role || 'Admin')}</span>
                         <div className="relative" ref={userRef}>
-                            <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 text-sm text-gray-700 hover:text-emerald-600">
-                                <div className="w-8 h-8 rounded-full emerald-gradient flex items-center justify-center text-white text-xs font-bold">
+                            <button onClick={() => setUserMenuOpen(!userMenuOpen)} className={`flex items-center gap-2 text-sm ${isMaster ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-emerald-600'}`}>
+                                <div className={`w-8 h-8 rounded-full ${isMaster ? 'bg-purple-600' : 'emerald-gradient'} flex items-center justify-center text-white text-xs font-bold`}>
                                     {(profile?.name || 'U').charAt(0).toUpperCase()}
                                 </div>
                                 <span className="font-medium">{profile?.name || 'User'}</span>
@@ -1149,13 +1176,21 @@
         }
 
         // ── MASTER ADMIN PAGE (Super Admin only) ─────────────────────────────
-        function MasterAdminPage() {
+        function MasterAdminPage({ activeTab }) {
             const { user, profile, toast } = useContext(AppCtx);
-            const [tab, setTab] = useState('overview');
             const [orgs, setOrgs] = useState([]);
             const [allUsers, setAllUsers] = useState([]);
             const [allCodes, setAllCodes] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [newNote, setNewNote] = useState('');
+            const [newMaxUses, setNewMaxUses] = useState(1);
+            const [saving, setSaving] = useState(false);
+            const [userSearch, setUserSearch] = useState('');
+            const [orgSearch, setOrgSearch] = useState('');
+            const [selectedOrg, setSelectedOrg] = useState(null);
+            const [codeSearch, setCodeSearch] = useState('');
+            const growthRef = useRef(null);
+            const growthChart = useRef(null);
 
             if (profile?.email !== MASTER_ADMIN_EMAIL) return (
                 <div className="p-12 text-center text-gray-500 text-sm">Access denied — Master Admin only.</div>
@@ -1185,209 +1220,518 @@
             const deleteOrg = async (id) => {
                 if (!confirm('Delete this organization and all its data? This cannot be undone.')) return;
                 await sb.rpc('master_delete_org', { p_org_id: id });
-                toast('Organization deleted'); await load();
+                toast('Organization deleted'); setSelectedOrg(null); await load();
             };
 
-            if (loading) return <div className="p-12 flex justify-center"><Spinner size={8} /></div>;
+            const generateCode = async () => {
+                setSaving(true);
+                const part1 = Math.random().toString(36).slice(2, 8).toUpperCase();
+                const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
+                const code = part1 + '-' + part2;
+                const { error } = await sb.from('invite_codes').insert({ code, note: newNote || null, max_uses: parseInt(newMaxUses) || 1, uses_count: 0, created_by: user.id });
+                if (error) { toast(error.message, 'error'); } else { toast('Invite code generated: ' + code); setNewNote(''); setNewMaxUses(1); await load(); }
+                setSaving(false);
+            };
+
+            const deleteCode = async (id) => {
+                if (!confirm('Delete this invite code?')) return;
+                await sb.from('invite_codes').delete().eq('id', id);
+                toast('Code deleted'); await load();
+            };
+
+            const copyCode = (code) => {
+                navigator.clipboard.writeText(code).then(() => toast('Copied to clipboard'));
+            };
+
+            if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Spinner size={10} /></div>;
 
             const totalOrgs = orgs.length;
             const totalUsers = allUsers.length;
             const activeUsers = allUsers.filter(u => (u.status || 'active') === 'active').length;
             const suspendedUsers = allUsers.filter(u => u.status === 'suspended').length;
-            const codesUsed = allCodes.filter(c => c.uses_count >= c.max_uses).length;
+            const codesUsed = allCodes.filter(c => c.uses_count >= (c.max_uses || 1)).length;
             const codesAvail = allCodes.length - codesUsed;
             const last7d = allUsers.filter(u => new Date(u.created_at) > new Date(Date.now() - 7*86400000)).length;
             const last30d = allUsers.filter(u => new Date(u.created_at) > new Date(Date.now() - 30*86400000)).length;
 
-            const tabs = [{id:'overview',label:'Overview'},{id:'orgs',label:'Organizations'},{id:'users',label:'All Users'},{id:'codes',label:'All Invite Codes'},{id:'analytics',label:'Analytics'}];
+            const tab = activeTab || 'overview';
 
-            return (
+            // ── OVERVIEW TAB ──
+            if (tab === 'overview') return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <div className="mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Platform Overview</h1>
+                        <p className="text-sm text-gray-500 mt-1">Real-time snapshot of your TalentFlow platform</p>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        {[
+                            { label: 'Active Customers', val: totalOrgs, color: 'text-purple-600', bg: 'bg-purple-50', icon: 'Building' },
+                            { label: 'Total Users', val: totalUsers, color: 'text-blue-600', bg: 'bg-blue-50' },
+                            { label: 'Active Users', val: activeUsers, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                            { label: 'Suspended', val: suspendedUsers, color: 'text-red-600', bg: 'bg-red-50' },
+                            { label: 'New (7 days)', val: last7d, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                            { label: 'New (30 days)', val: last30d, color: 'text-cyan-600', bg: 'bg-cyan-50' },
+                            { label: 'Codes Available', val: codesAvail, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                            { label: 'Codes Used', val: codesUsed, color: 'text-gray-600', bg: 'bg-gray-50' }
+                        ].map((s, i) => (
+                            <div key={i} className={`${s.bg} rounded-xl p-5 border border-gray-100`}>
+                                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{s.label}</p>
+                                <p className={`text-3xl font-bold mt-2 ${s.color}`}>{s.val}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Signups</h3>
+                            <div className="space-y-1">
+                                {allUsers.slice(0, 6).map(u => (
+                                    <div key={u.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xs font-bold">{(u.name||'?').charAt(0).toUpperCase()}</div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">{u.name || 'Unnamed'}</p>
+                                                <p className="text-xs text-gray-400">{u.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span>
+                                            <p className="text-xs text-gray-400 mt-1">{u.org_name || 'No org'}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                                {allUsers.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No users yet</p>}
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Customer Organizations</h3>
+                            <div className="space-y-1">
+                                {orgs.slice(0, 6).map(o => (
+                                    <div key={o.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">{o.name.charAt(0).toUpperCase()}</div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">{o.name}</p>
+                                                <p className="text-xs text-gray-400">Since {new Date(o.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-sm font-semibold text-purple-600">{o.member_count} <span className="text-xs font-normal text-gray-400">users</span></span>
+                                    </div>
+                                ))}
+                                {orgs.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No customers yet</p>}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-gray-900">Quick Actions</h3>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <button onClick={() => {}} className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
+                                <p className="text-sm font-semibold text-gray-900">Generate Invite Code</p>
+                                <p className="text-xs text-gray-500 mt-1">Create a new code for customer onboarding</p>
+                            </button>
+                            <button className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
+                                <p className="text-sm font-semibold text-gray-900">View All Customers</p>
+                                <p className="text-xs text-gray-500 mt-1">Manage organizations and subscriptions</p>
+                            </button>
+                            <button className="p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all text-left">
+                                <p className="text-sm font-semibold text-gray-900">Platform Analytics</p>
+                                <p className="text-xs text-gray-500 mt-1">Track product performance and growth</p>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // ── CUSTOMERS TAB ──
+            if (tab === 'customers') return (
                 <div className="p-6 max-w-7xl mx-auto">
                     <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Master Admin Console</h1>
-                            <p className="text-sm text-gray-500 mt-1">Global platform management — all organizations & users</p>
+                            <h1 className="text-2xl font-bold text-gray-900">Customer Organizations</h1>
+                            <p className="text-sm text-gray-500 mt-1">{totalOrgs} organization{totalOrgs !== 1 ? 's' : ''} on the platform</p>
                         </div>
-                        <span className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold">Super Admin</span>
                     </div>
-
-                    <div className="flex gap-2 mb-6 flex-wrap">
-                        {tabs.map(t => (
-                            <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === t.id ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{t.label}</button>
-                        ))}
+                    <div className="mb-4">
+                        <input value={orgSearch} onChange={e => setOrgSearch(e.target.value)} placeholder="Search organizations..." className="w-full max-w-md px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
                     </div>
-
-                    {tab === 'overview' && (
-                        <div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                                {[
-                                    { label: 'Total Organizations', val: totalOrgs, color: 'text-purple-600', bg: 'bg-purple-50' },
-                                    { label: 'Total Users', val: totalUsers, color: 'text-blue-600', bg: 'bg-blue-50' },
-                                    { label: 'Active Users', val: activeUsers, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                                    { label: 'Suspended', val: suspendedUsers, color: 'text-red-600', bg: 'bg-red-50' },
-                                    { label: 'Signups (7 days)', val: last7d, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                                    { label: 'Signups (30 days)', val: last30d, color: 'text-cyan-600', bg: 'bg-cyan-50' },
-                                    { label: 'Codes Available', val: codesAvail, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                                    { label: 'Codes Used', val: codesUsed, color: 'text-gray-600', bg: 'bg-gray-50' }
-                                ].map((s, i) => (
-                                    <div key={i} className={`${s.bg} rounded-xl p-4 border border-gray-100`}>
-                                        <p className="text-xs text-gray-500 font-medium">{s.label}</p>
-                                        <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.val}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {orgs.filter(o => !orgSearch || o.name.toLowerCase().includes(orgSearch.toLowerCase())).map(o => {
+                            const orgUsers = allUsers.filter(u => u.org_id === o.id);
+                            const orgOwner = orgUsers.find(u => u.role === 'Owner');
+                            return (
+                                <div key={o.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold">{o.name.charAt(0)}</div>
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-gray-900">{o.name}</h3>
+                                                <p className="text-xs text-gray-400">Since {new Date(o.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                                <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Signups</h3>
-                                <div className="space-y-2">
-                                    {allUsers.slice(0, 8).map(u => (
-                                        <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xs font-bold">{(u.name||'?').charAt(0).toUpperCase()}</div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-900">{u.name || 'Unnamed'}</p>
-                                                    <p className="text-xs text-gray-400">{u.email} — {u.org_name || 'No org'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span>
-                                                <span className="text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</span>
-                                            </div>
+                                    <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                                            <p className="text-lg font-bold text-purple-600">{o.member_count}</p>
+                                            <p className="text-xs text-gray-500">Users</p>
                                         </div>
-                                    ))}
-                                    {allUsers.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No users yet</p>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {tab === 'orgs' && (
-                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr>{['Organization','Members','Created','Actions'].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {orgs.map(o => (
-                                        <tr key={o.id} className="hover:bg-gray-50">
-                                            <td className="px-5 py-4">
-                                                <p className="text-sm font-medium text-gray-900">{o.name}</p>
-                                                <p className="text-xs text-gray-400 font-mono">{o.id.slice(0,8)}…</p>
-                                            </td>
-                                            <td className="px-5 py-4"><span className="text-sm font-semibold text-gray-700">{o.member_count}</span> <span className="text-xs text-gray-400">users</span></td>
-                                            <td className="px-5 py-4 text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString()}</td>
-                                            <td className="px-5 py-4"><button onClick={() => deleteOrg(o.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Delete Org</button></td>
-                                        </tr>
-                                    ))}
-                                    {orgs.length === 0 && <tr><td colSpan={4} className="text-center py-12 text-gray-400 text-sm">No organizations</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {tab === 'users' && (
-                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr>{['User','Email','Organization','Role','Status','Joined','Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {allUsers.map(u => (
-                                        <tr key={u.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.name || '—'}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-500">{u.email}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-500">{u.org_name || '—'}</td>
-                                            <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span></td>
-                                            <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${(u.status||'active') === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{u.status||'active'}</span></td>
-                                            <td className="px-4 py-3 text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
-                                            <td className="px-4 py-3">
-                                                {u.email !== MASTER_ADMIN_EMAIL && (
-                                                    <div className="flex gap-2">
-                                                        {(u.status||'active') !== 'suspended' ? (
-                                                            <button onClick={() => suspendUser(u.id)} className="text-xs text-red-500 hover:text-red-700 font-medium">Suspend</button>
-                                                        ) : (
-                                                            <button onClick={() => activateUser(u.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">Activate</button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {allUsers.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No users</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {tab === 'codes' && (
-                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b"><tr>{['Code','Note','Created By','Status','Used By','Created'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {allCodes.map(c => (
-                                        <tr key={c.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3"><code className="text-sm font-mono bg-purple-50 text-purple-700 px-2 py-1 rounded">{c.code}</code></td>
-                                            <td className="px-4 py-3 text-sm text-gray-500">{c.note || <span className="text-gray-300">—</span>}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-400">{c.creator_email || '—'}</td>
-                                            <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${c.uses_count >= c.max_uses ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'}`}>{c.uses_count >= c.max_uses ? 'Used' : 'Available'}</span></td>
-                                            <td className="px-4 py-3 text-xs text-gray-400">{c.user_email || <span className="text-gray-300">—</span>}</td>
-                                            <td className="px-4 py-3 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
-                                        </tr>
-                                    ))}
-                                    {allCodes.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">No invite codes</td></tr>}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {tab === 'analytics' && (
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                                <h3 className="text-sm font-semibold text-gray-900 mb-4">User Growth</h3>
-                                <div className="grid grid-cols-6 gap-1 items-end h-40">
-                                    {(() => {
-                                        const months = [];
-                                        for (let i = 5; i >= 0; i--) {
-                                            const d = new Date(); d.setMonth(d.getMonth() - i);
-                                            const label = d.toLocaleDateString('en-US', {month:'short', year:'2-digit'});
-                                            const count = allUsers.filter(u => { const ud = new Date(u.created_at); return ud.getMonth() === d.getMonth() && ud.getFullYear() === d.getFullYear(); }).length;
-                                            months.push({ label, count });
-                                        }
-                                        const max = Math.max(...months.map(m => m.count), 1);
-                                        return months.map((m, i) => (
-                                            <div key={i} className="flex flex-col items-center gap-1">
-                                                <span className="text-xs font-semibold text-purple-600">{m.count}</span>
-                                                <div className="w-full bg-purple-200 rounded-t" style={{height: `${(m.count/max)*100}%`, minHeight: m.count > 0 ? '8px' : '2px'}}></div>
-                                                <span className="text-xs text-gray-400">{m.label}</span>
-                                            </div>
-                                        ));
-                                    })()}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Roles Breakdown</h3>
-                                    {(() => {
-                                        const roles = {};
-                                        allUsers.forEach(u => { roles[u.role] = (roles[u.role] || 0) + 1; });
-                                        return Object.entries(roles).map(([role, count]) => (
-                                            <div key={role} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                                                <span className={`text-xs px-2 py-1 rounded font-medium ${role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{role}</span>
-                                                <span className="text-sm font-semibold text-gray-700">{count}</span>
-                                            </div>
-                                        ));
-                                    })()}
-                                </div>
-                                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Organizations</h3>
-                                    {orgs.sort((a,b) => b.member_count - a.member_count).slice(0,5).map(o => (
-                                        <div key={o.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                                            <span className="text-sm text-gray-700">{o.name}</span>
-                                            <span className="text-sm font-semibold text-purple-600">{o.member_count} users</span>
+                                        <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                                            <p className="text-lg font-bold text-emerald-600">{orgUsers.filter(u => (u.status||'active') === 'active').length}</p>
+                                            <p className="text-xs text-gray-500">Active</p>
                                         </div>
-                                    ))}
-                                    {orgs.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No organizations</p>}
+                                    </div>
+                                    {orgOwner && <p className="text-xs text-gray-500 mb-3">Owner: <span className="font-medium text-gray-700">{orgOwner.email}</span></p>}
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setSelectedOrg(o)} className="flex-1 text-center py-2 text-xs font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50">View Details</button>
+                                        <button onClick={() => deleteOrg(o.id)} className="py-2 px-3 text-xs font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {orgs.length === 0 && <div className="col-span-3 text-center py-16 text-gray-400"><p className="text-lg font-medium">No customers yet</p><p className="text-sm mt-1">Organizations will appear here once users sign up</p></div>}
+                    </div>
+                    {selectedOrg && (
+                        <div className="modal-overlay" onClick={() => setSelectedOrg(null)}>
+                            <div className="modal-content w-2xl p-6" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-lg font-bold">{selectedOrg.name.charAt(0)}</div>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-gray-900">{selectedOrg.name}</h2>
+                                            <p className="text-xs text-gray-400 font-mono">{selectedOrg.id}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedOrg(null)} className="text-gray-400 hover:text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3 mb-4">
+                                    <div className="bg-purple-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-purple-600">{selectedOrg.member_count}</p><p className="text-xs text-gray-500">Members</p></div>
+                                    <div className="bg-emerald-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-emerald-600">{allUsers.filter(u => u.org_id === selectedOrg.id && (u.status||'active') === 'active').length}</p><p className="text-xs text-gray-500">Active</p></div>
+                                    <div className="bg-gray-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-gray-600">{new Date(selectedOrg.created_at).toLocaleDateString()}</p><p className="text-xs text-gray-500">Created</p></div>
+                                </div>
+                                <h3 className="text-sm font-semibold text-gray-900 mb-2">Team Members</h3>
+                                <div className="bg-gray-50 rounded-lg overflow-hidden mb-4">
+                                    <table className="w-full">
+                                        <thead><tr className="border-b border-gray-200">{['Name','Email','Role','Status'].map(h => <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-600">{h}</th>)}</tr></thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {allUsers.filter(u => u.org_id === selectedOrg.id).map(u => (
+                                                <tr key={u.id}>
+                                                    <td className="px-3 py-2 text-sm text-gray-900">{u.name || '—'}</td>
+                                                    <td className="px-3 py-2 text-sm text-gray-500">{u.email}</td>
+                                                    <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span></td>
+                                                    <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded font-medium ${(u.status||'active') === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{u.status||'active'}</span></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setSelectedOrg(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">Close</button>
+                                    <button onClick={() => deleteOrg(selectedOrg.id)} className="py-2 px-4 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete Organization</button>
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
             );
+
+            // ── USERS TAB ──
+            if (tab === 'users') return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">All Platform Users</h1>
+                            <p className="text-sm text-gray-500 mt-1">{totalUsers} user{totalUsers !== 1 ? 's' : ''} across all organizations</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded font-medium">{activeUsers} active</span>
+                            {suspendedUsers > 0 && <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-medium">{suspendedUsers} suspended</span>}
+                        </div>
+                    </div>
+                    <div className="mb-4">
+                        <input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Search by name, email, or organization..." className="w-full max-w-md px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>{['User','Email','Organization','Role','Status','Joined','Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {allUsers.filter(u => {
+                                    if (!userSearch) return true;
+                                    const q = userSearch.toLowerCase();
+                                    return (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.org_name||'').toLowerCase().includes(q);
+                                }).map(u => (
+                                    <tr key={u.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xs font-bold">{(u.name||'?').charAt(0).toUpperCase()}</div>
+                                                <span className="text-sm font-medium text-gray-900">{u.name || '—'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-500">{u.email}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-500">{u.org_name || <span className="text-gray-300">No org</span>}</td>
+                                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${u.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</span></td>
+                                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${(u.status||'active') === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{u.status||'active'}</span></td>
+                                        <td className="px-4 py-3 text-xs text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
+                                        <td className="px-4 py-3">
+                                            {u.email !== MASTER_ADMIN_EMAIL && (
+                                                <div className="flex gap-2">
+                                                    {(u.status||'active') !== 'suspended' ? (
+                                                        <button onClick={() => suspendUser(u.id)} className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50">Suspend</button>
+                                                    ) : (
+                                                        <button onClick={() => activateUser(u.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2 py-1 rounded hover:bg-emerald-50">Activate</button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {allUsers.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No users</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+
+            // ── INVITE CODES TAB ──
+            if (tab === 'codes') return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Invite Codes</h1>
+                            <p className="text-sm text-gray-500 mt-1">Generate and manage customer onboarding codes</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded font-medium">{codesAvail} available</span>
+                            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium">{codesUsed} used</span>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 shadow-sm">
+                        <h2 className="text-sm font-semibold text-gray-900 mb-1">Generate New Invite Code</h2>
+                        <p className="text-xs text-gray-500 mb-4">Create a code to onboard a new customer organization</p>
+                        <div className="flex gap-3 items-end">
+                            <div className="flex-1">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Note (optional)</label>
+                                <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="e.g. Acme Corp trial, Enterprise pilot" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            </div>
+                            <div className="w-32">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Max Uses</label>
+                                <input type="number" min="1" max="100" value={newMaxUses} onChange={e => setNewMaxUses(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                            </div>
+                            <button onClick={generateCode} disabled={saving} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-60 whitespace-nowrap">
+                                {saving ? <Spinner size={4}/> : null} Generate Code
+                            </button>
+                        </div>
+                    </div>
+                    <div className="mb-4">
+                        <input value={codeSearch} onChange={e => setCodeSearch(e.target.value)} placeholder="Search codes or notes..." className="w-full max-w-md px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                        <table className="w-full">
+                            <thead className="bg-gray-50 border-b"><tr>{['Code','Note','Max Uses','Used','Status','Created By','Used By','Created','Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">{h}</th>)}</tr></thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {allCodes.filter(c => {
+                                    if (!codeSearch) return true;
+                                    const q = codeSearch.toLowerCase();
+                                    return (c.code||'').toLowerCase().includes(q) || (c.note||'').toLowerCase().includes(q);
+                                }).map(c => (
+                                    <tr key={c.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <code className="text-sm font-mono bg-purple-50 text-purple-700 px-2 py-1 rounded tracking-wider">{c.code}</code>
+                                                <button onClick={() => copyCode(c.code)} className="text-gray-400 hover:text-purple-600" title="Copy">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeWidth="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2"/></svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-500">{c.note || <span className="text-gray-300">—</span>}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600 text-center">{c.max_uses || 1}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600 text-center">{c.uses_count || 0}</td>
+                                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${(c.uses_count||0) >= (c.max_uses||1) ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'}`}>{(c.uses_count||0) >= (c.max_uses||1) ? 'Used' : 'Available'}</span></td>
+                                        <td className="px-4 py-3 text-xs text-gray-400">{c.creator_email || '—'}</td>
+                                        <td className="px-4 py-3 text-xs text-gray-400">{c.user_email || <span className="text-gray-300">—</span>}</td>
+                                        <td className="px-4 py-3 text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</td>
+                                        <td className="px-4 py-3"><button onClick={() => deleteCode(c.id)} className="text-xs text-red-400 hover:text-red-600 font-medium">Delete</button></td>
+                                    </tr>
+                                ))}
+                                {allCodes.length === 0 && <tr><td colSpan={9} className="text-center py-12 text-gray-400 text-sm">No invite codes yet — generate one above</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+
+            // ── ANALYTICS TAB ──
+            if (tab === 'analytics') return (
+                <div className="p-6 max-w-7xl mx-auto">
+                    <div className="mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Platform Analytics</h1>
+                        <p className="text-sm text-gray-500 mt-1">Track product performance, growth, and adoption</p>
+                    </div>
+                    <div className="grid grid-cols-4 gap-4 mb-6">
+                        {[
+                            { label: 'MRR Customers', val: totalOrgs, sub: 'organizations', color: 'text-purple-600' },
+                            { label: 'Users / Org', val: totalOrgs > 0 ? (totalUsers / totalOrgs).toFixed(1) : '0', sub: 'average', color: 'text-blue-600' },
+                            { label: 'Invite Conversion', val: allCodes.length > 0 ? Math.round((codesUsed / allCodes.length) * 100) + '%' : '0%', sub: 'codes used', color: 'text-emerald-600' },
+                            { label: 'Growth (30d)', val: last30d, sub: 'new users', color: 'text-indigo-600' }
+                        ].map((s, i) => (
+                            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{s.label}</p>
+                                <p className={`text-3xl font-bold mt-2 ${s.color}`}>{s.val}</p>
+                                <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-4">User Growth (6 months)</h3>
+                            <div className="grid grid-cols-6 gap-2 items-end" style={{height:'180px'}}>
+                                {(() => {
+                                    const months = [];
+                                    for (let i = 5; i >= 0; i--) {
+                                        const d = new Date(); d.setMonth(d.getMonth() - i);
+                                        const label = d.toLocaleDateString('en-US', {month:'short'});
+                                        const count = allUsers.filter(u => { const ud = new Date(u.created_at); return ud.getMonth() === d.getMonth() && ud.getFullYear() === d.getFullYear(); }).length;
+                                        months.push({ label, count });
+                                    }
+                                    const max = Math.max(...months.map(m => m.count), 1);
+                                    return months.map((m, i) => (
+                                        <div key={i} className="flex flex-col items-center gap-1 h-full justify-end">
+                                            <span className="text-xs font-bold text-purple-600">{m.count}</span>
+                                            <div className="w-full bg-gradient-to-t from-purple-600 to-purple-400 rounded-t transition-all" style={{height: `${Math.max((m.count/max)*140, m.count > 0 ? 12 : 4)}px`}}></div>
+                                            <span className="text-xs text-gray-500 font-medium">{m.label}</span>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-4">Org Growth (6 months)</h3>
+                            <div className="grid grid-cols-6 gap-2 items-end" style={{height:'180px'}}>
+                                {(() => {
+                                    const months = [];
+                                    for (let i = 5; i >= 0; i--) {
+                                        const d = new Date(); d.setMonth(d.getMonth() - i);
+                                        const label = d.toLocaleDateString('en-US', {month:'short'});
+                                        const count = orgs.filter(o => { const od = new Date(o.created_at); return od.getMonth() === d.getMonth() && od.getFullYear() === d.getFullYear(); }).length;
+                                        months.push({ label, count });
+                                    }
+                                    const max = Math.max(...months.map(m => m.count), 1);
+                                    return months.map((m, i) => (
+                                        <div key={i} className="flex flex-col items-center gap-1 h-full justify-end">
+                                            <span className="text-xs font-bold text-indigo-600">{m.count}</span>
+                                            <div className="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t transition-all" style={{height: `${Math.max((m.count/max)*140, m.count > 0 ? 12 : 4)}px`}}></div>
+                                            <span className="text-xs text-gray-500 font-medium">{m.label}</span>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-6">
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Roles Distribution</h3>
+                            {(() => {
+                                const roles = {};
+                                allUsers.forEach(u => { roles[u.role] = (roles[u.role] || 0) + 1; });
+                                const total = allUsers.length || 1;
+                                return Object.entries(roles).sort((a,b) => b[1]-a[1]).map(([role, count]) => (
+                                    <div key={role} className="mb-2">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-medium text-gray-700">{role}</span>
+                                            <span className="text-xs text-gray-500">{count} ({Math.round(count/total*100)}%)</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-2">
+                                            <div className="bg-purple-500 h-2 rounded-full" style={{width: (count/total*100)+'%'}}></div>
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Organizations by Size</h3>
+                            {[...orgs].sort((a,b) => b.member_count - a.member_count).slice(0,6).map((o, i) => (
+                                <div key={o.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-400 w-4">#{i+1}</span>
+                                        <span className="text-sm text-gray-700">{o.name}</span>
+                                    </div>
+                                    <span className="text-sm font-semibold text-purple-600">{o.member_count}</span>
+                                </div>
+                            ))}
+                            {orgs.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No data</p>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-3">Platform Health</h3>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">User Retention</span>
+                                    <span className="text-sm font-semibold text-emerald-600">{totalUsers > 0 ? Math.round(activeUsers/totalUsers*100) : 0}%</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">Code Utilization</span>
+                                    <span className="text-sm font-semibold text-blue-600">{allCodes.length > 0 ? Math.round(codesUsed/allCodes.length*100) : 0}%</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">Avg Team Size</span>
+                                    <span className="text-sm font-semibold text-purple-600">{totalOrgs > 0 ? (totalUsers/totalOrgs).toFixed(1) : '0'}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">7-day Growth Rate</span>
+                                    <span className="text-sm font-semibold text-indigo-600">{totalUsers > 0 ? Math.round(last7d/totalUsers*100) : 0}%</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">Suspended Rate</span>
+                                    <span className={`text-sm font-semibold ${suspendedUsers > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{totalUsers > 0 ? Math.round(suspendedUsers/totalUsers*100) : 0}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // ── SETTINGS TAB ──
+            if (tab === 'settings') return (
+                <div className="p-6 max-w-3xl mx-auto">
+                    <div className="mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Platform Settings</h1>
+                        <p className="text-sm text-gray-500 mt-1">Configuration and admin settings</p>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-1">Master Admin</h3>
+                            <p className="text-xs text-gray-500 mb-3">The master admin email has full platform control</p>
+                            <div className="flex items-center gap-3">
+                                <code className="text-sm bg-gray-100 px-3 py-2 rounded-lg text-gray-700 font-mono">{MASTER_ADMIN_EMAIL}</code>
+                                <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium">Active</span>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-1">Supabase Project</h3>
+                            <p className="text-xs text-gray-500 mb-3">Backend infrastructure details</p>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">Project URL</span>
+                                    <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{SUPABASE_URL}</code>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">Tables</span>
+                                    <span className="text-xs text-gray-600">organizations, profiles, pipelines, candidates, templates, nova_sessions, invite_codes</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-1">Platform Stats</h3>
+                            <div className="grid grid-cols-2 gap-3 mt-3">
+                                <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Total Orgs</p><p className="text-lg font-bold text-gray-900">{totalOrgs}</p></div>
+                                <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Total Users</p><p className="text-lg font-bold text-gray-900">{totalUsers}</p></div>
+                                <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Invite Codes</p><p className="text-lg font-bold text-gray-900">{allCodes.length}</p></div>
+                                <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Active Rate</p><p className="text-lg font-bold text-gray-900">{totalUsers > 0 ? Math.round(activeUsers/totalUsers*100) : 0}%</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            return <div className="p-6"><p className="text-gray-500">Unknown tab</p></div>;
         }
 
         // ── APP ROOT ─────────────────────────────────────────────────────────
@@ -1436,26 +1780,39 @@
             if (!user) return <AuthPage />;
 
             const orgId = profile?.org_id || null;
+            const isMasterAdmin = profile?.email === MASTER_ADMIN_EMAIL;
+
+            // Auto-redirect master admin to their console
+            const effectivePage = isMasterAdmin && currentPage === 'dashboard' ? 'master-overview' : currentPage;
 
             const renderPage = () => {
-                if (currentPage === 'dashboard') return <DashboardPage />;
-                if (currentPage === 'pipelines') return <PipelinesPage onNavigate={navigate} />;
-                if (currentPage.startsWith('pipeline-detail')) return <PipelineDetailPage pipeline={pageParams} onBack={() => navigate('pipelines')} />;
-                if (currentPage === 'candidates-overview') return <CandidatesOverviewPage />;
-                if (currentPage === 'candidates-duplicates') return <DuplicatesPage />;
-                if (currentPage === 'templates') return <TemplatesPage />;
-                if (currentPage === 'nova') return <NovaPage />;
-                if (currentPage.startsWith('org-')) return <OrganisationPage tab={currentPage.replace('org-','')} />;
-                if (currentPage === 'admin') return <AdminPage />;
-                if (currentPage === 'master-admin') return <MasterAdminPage />;
+                // Master admin pages
+                if (effectivePage === 'master-overview') return <MasterAdminPage activeTab="overview" />;
+                if (effectivePage === 'master-customers') return <MasterAdminPage activeTab="customers" />;
+                if (effectivePage === 'master-users') return <MasterAdminPage activeTab="users" />;
+                if (effectivePage === 'master-codes') return <MasterAdminPage activeTab="codes" />;
+                if (effectivePage === 'master-analytics') return <MasterAdminPage activeTab="analytics" />;
+                if (effectivePage === 'master-settings') return <MasterAdminPage activeTab="settings" />;
+                // Legacy route
+                if (effectivePage === 'master-admin') return <MasterAdminPage activeTab="overview" />;
+                // Regular app pages
+                if (effectivePage === 'dashboard') return <DashboardPage />;
+                if (effectivePage === 'pipelines') return <PipelinesPage onNavigate={navigate} />;
+                if (effectivePage.startsWith('pipeline-detail')) return <PipelineDetailPage pipeline={pageParams} onBack={() => navigate('pipelines')} />;
+                if (effectivePage === 'candidates-overview') return <CandidatesOverviewPage />;
+                if (effectivePage === 'candidates-duplicates') return <DuplicatesPage />;
+                if (effectivePage === 'templates') return <TemplatesPage />;
+                if (effectivePage === 'nova') return <NovaPage />;
+                if (effectivePage.startsWith('org-')) return <OrganisationPage tab={effectivePage.replace('org-','')} />;
+                if (effectivePage === 'admin') return <AdminPage />;
                 return <DashboardPage />;
             };
 
             return (
                 <AppCtx.Provider value={{ orgId, user, profile, toast: showToast }}>
                     <div className="min-h-screen bg-gray-50">
-                        <Navbar currentPage={currentPage} onNavigate={navigate} />
-                        {!orgId && (
+                        <Navbar currentPage={effectivePage} onNavigate={navigate} />
+                        {!orgId && !isMasterAdmin && (
                             <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 text-sm text-yellow-800 text-center">
                                 Setting up your workspace... If this persists, please sign out and sign back in.
                             </div>
