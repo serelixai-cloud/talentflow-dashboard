@@ -200,10 +200,10 @@
 
         // ── NAVBAR ──────────────────────────────────────────────────────────
         function Navbar({ currentPage, onNavigate }) {
-            const { profile } = useContext(AppCtx);
+            const { profile, user } = useContext(AppCtx);
             const [userMenuOpen, setUserMenuOpen] = useState(false);
             const userRef = useRef(null);
-            const isMaster = profile?.email === MASTER_ADMIN_EMAIL;
+            const isMaster = user?.email === MASTER_ADMIN_EMAIL;
             useEffect(() => {
                 const h = e => { if (userRef.current && !userRef.current.contains(e.target)) setUserMenuOpen(false); };
                 if (userMenuOpen) { document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }
@@ -1200,7 +1200,7 @@
             const growthRef = useRef(null);
             const growthChart = useRef(null);
 
-            if (profile?.email !== MASTER_ADMIN_EMAIL) return (
+            if (user?.email !== MASTER_ADMIN_EMAIL) return (
                 <div className="p-12 text-center text-gray-500 text-sm">Access denied — Master Admin only.</div>
             );
 
@@ -1758,8 +1758,16 @@
             }, []);
 
             const loadProfile = useCallback(async (uid) => {
-                const { data } = await sb.from('profiles').select('*').eq('id', uid).single();
-                setProfile(data || null);
+                try {
+                    const { data, error } = await sb.from('profiles').select('*').eq('id', uid).single();
+                    if (error) { console.error('Profile load error:', error.message); }
+                    if (data) { setProfile(data); }
+                    else {
+                        // Fallback: get email from auth user for master admin detection
+                        const { data: { user: authUser } } = await sb.auth.getUser();
+                        if (authUser) { setProfile({ id: uid, email: authUser.email, name: authUser.user_metadata?.name || null, role: 'Member', org_id: null, status: 'active' }); }
+                    }
+                } catch(e) { console.error('Profile load exception:', e); }
             }, []);
 
             useEffect(() => {
@@ -1788,7 +1796,7 @@
             if (!user) return <AuthPage />;
 
             const orgId = profile?.org_id || null;
-            const isMasterAdmin = profile?.email === MASTER_ADMIN_EMAIL;
+            const isMasterAdmin = user?.email === MASTER_ADMIN_EMAIL;
 
             // Auto-redirect master admin to their console
             const effectivePage = isMasterAdmin && currentPage === 'dashboard' ? 'master-overview' : currentPage;
